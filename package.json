@@ -1,0 +1,18 @@
+{
+  "name": "silai-saathi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Employee and production management app for Petticoat and RMG teams",
+  "scripts": {
+    "start": "npm --prefix mobile run start",
+    "web": "npm --prefix mobile run web",
+    "android": "npm --prefix mobile run android",
+    "ios": "npm --prefix mobile run ios",
+    "typecheck": "npm --prefix mobile run typecheck",
+    "check": "npm --prefix mobile run typecheck && npm --prefix backend run check",
+    "backend": "npm --prefix backend run dev",
+    "backend:build": "npm --prefix backend run build",
+    "backend:start": "npm --prefix backend run build && npm --prefix backend run start",
+    "db:setup": "npm --prefix backend run db:setup"
+  }
+}

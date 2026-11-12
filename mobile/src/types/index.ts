@@ -1,0 +1,154 @@
+export type Department = "PETTICOAT" | "RMG";
+export type UserRole = "admin" | "manager";
+
+export type SessionUser = {
+  id: string;
+  name: string;
+  username: string;
+  role: UserRole;
+  department: Department | null;
+  isActive?: boolean;
+  createdAt?: string;
+};
+
+export type Manager = {
+  id: string;
+  name: string;
+  username: string;
+  role: "manager";
+  department: Department;
+  isActive: boolean;
+  lastLoginAt?: string | null;
+  createdAt: string;
+};
+
+export type Employee = {
+  id: string;
+  name: string;
+  department: Department;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type Operation = {
+  id: string;
+  name: string;
+  department: Department;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type WorkEntry = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  managerId: string;
+  managerName: string;
+  operationId: string;
+  operationName: string;
+  lotNo: string;
+  quantity: number;
+  department: Department;
+  createdAt: string;
+};
+
+export type LoginResult = {
+  token: string;
+  user: SessionUser;
+};
+
+export type ManagerHomeData = {
+  employees: Employee[];
+  operations: Operation[];
+  entries: WorkEntry[];
+  stats: {
+    todayEntries: number;
+    todayPieces: number;
+  };
+};
+
+export type AdminDashboardData = {
+  stats: {
+    activeManagers: number;
+    activeEmployees: number;
+    activeOperations: number;
+    todayEntries: number;
+    todayPieces: number;
+  };
+  recentEntries: WorkEntry[];
+};
+
+export type CreateManagerInput = {
+  name: string;
+  username: string;
+  password: string;
+  department: Department;
+};
+
+export type UpdateManagerInput = {
+  name?: string;
+  department?: Department;
+  password?: string;
+  isActive?: boolean;
+};
+
+export type CreateEmployeeInput = {
+  name: string;
+  department: Department;
+};
+
+export type UpdateEmployeeInput = {
+  name?: string;
+  department?: Department;
+  isActive?: boolean;
+};
+
+export type CreateOperationInput = {
+  name: string;
+  department: Department;
+};
+
+export type UpdateOperationInput = {
+  name?: string;
+  department?: Department;
+  isActive?: boolean;
+};
+
+export type CreateWorkEntryInput = {
+  employeeId: string;
+  operationId: string;
+  lotNo: string;
+  quantity: number;
+};
+
+export type DataSource = {
+  loginAdmin(username: string, password: string): Promise<LoginResult>;
+  loginManager(
+    department: Department,
+    username: string,
+    password: string
+  ): Promise<LoginResult>;
+  me(): Promise<SessionUser>;
+
+  managerHome(): Promise<ManagerHomeData>;
+  managerEntries(limit?: number): Promise<WorkEntry[]>;
+  createWorkEntry(input: CreateWorkEntryInput): Promise<WorkEntry>;
+
+  adminDashboard(): Promise<AdminDashboardData>;
+  managers(): Promise<Manager[]>;
+  createManager(input: CreateManagerInput): Promise<Manager>;
+  updateManager(id: string, input: UpdateManagerInput): Promise<Manager>;
+  deleteManager(id: string): Promise<void>;
+  employees(): Promise<Employee[]>;
+  createEmployee(input: CreateEmployeeInput): Promise<Employee>;
+  updateEmployee(id: string, input: UpdateEmployeeInput): Promise<Employee>;
+  deleteEmployee(id: string): Promise<void>;
+  operations(): Promise<Operation[]>;
+  createOperation(input: CreateOperationInput): Promise<Operation>;
+  updateOperation(id: string, input: UpdateOperationInput): Promise<Operation>;
+  adminReportEntries(input: {
+    date: string;
+    department?: Department;
+  }): Promise<WorkEntry[]>;
+  entries(department?: Department, limit?: number): Promise<WorkEntry[]>;
+};
