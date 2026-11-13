@@ -20,6 +20,7 @@ import {
   Scissors,
   ShieldCheck,
   Shirt,
+  UsersRound,
   Wrench,
 } from "lucide-react-native";
 
@@ -33,6 +34,7 @@ import { APP_VERSION, IS_DEMO } from "../../constants/config";
 import { colors, departmentColors, radii, spacing } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import { AdminManageSheet } from "./AdminManageSheet";
 import type {
   AdminStackParamList,
   AdminTabParamList,
@@ -54,6 +56,7 @@ export function AdminSetupScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [adminManageOpen, setAdminManageOpen] = useState(false);
   const loadedOnce = useRef(false);
 
   const rootNavigation =
@@ -278,10 +281,38 @@ export function AdminSetupScreen({ navigation }: Props) {
           <View style={styles.infoRow}>
             <Info size={16} color={colors.muted} strokeWidth={2} />
             <Text style={styles.infoText}>
-              Admin logins can only be seeded from the backend. Manager and
-              employee access is managed from this app.
+              The main admin password can add or remove administrator accounts.
+              It is never saved on this device.
             </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Manage admins"
+            onPress={() => setAdminManageOpen(true)}
+            style={({ pressed }) => [
+              styles.manageAdminButton,
+              pressed && styles.manageAdminButtonPressed,
+            ]}
+          >
+            <View style={styles.manageAdminIcon}>
+              <UsersRound
+                size={18}
+                color={colors.white}
+                strokeWidth={2.2}
+              />
+            </View>
+            <View style={styles.manageAdminText}>
+              <Text style={styles.manageAdminTitle}>Manage admins</Text>
+              <Text style={styles.manageAdminHint}>
+                Add or remove administrator accounts
+              </Text>
+            </View>
+            <ShieldCheck
+              size={19}
+              color={colors.faint}
+              strokeWidth={1.9}
+            />
+          </Pressable>
           <PrimaryButton
             label="Log out"
             variant="danger"
@@ -305,6 +336,11 @@ export function AdminSetupScreen({ navigation }: Props) {
         </View>
         <Text style={styles.version}>Silai Saathi v{APP_VERSION}</Text>
       </ScrollView>
+      <AdminManageSheet
+        visible={adminManageOpen}
+        onClose={() => setAdminManageOpen(false)}
+        currentUserId={user?.id}
+      />
     </SafeAreaView>
   );
 }
@@ -487,6 +523,42 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 15,
     color: colors.faint,
+  },
+  manageAdminButton: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.admin,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  manageAdminButtonPressed: {
+    backgroundColor: "#102E2D",
+    transform: [{ scale: 0.99 }],
+  },
+  manageAdminIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryBright,
+  },
+  manageAdminText: {
+    flex: 1,
+  },
+  manageAdminTitle: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  manageAdminHint: {
+    color: "#D8E8E5",
+    fontSize: 9.5,
+    fontWeight: "500",
+    marginTop: 2,
   },
   modeRow: {
     flexDirection: "row",

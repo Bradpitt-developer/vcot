@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import express from "express";
 
+import { config } from "../config";
 import { pool } from "../db";
-import { authenticate, requireRole } from "../middleware/auth";
+import { authenticate, getAuthenticatedUser, requireRole } from "../middleware/auth";
 import type {
   CountRow,
   Department,
@@ -101,6 +103,40 @@ function isForeignKeyViolation(error: unknown): boolean {
   );
 }
 
+function isValidAdminManagePassword(value: unknown): boolean {
+  if (!config.adminMasterPassword) return false;
+  if (typeof value !== "string") return false;
+
+  const supplied = Buffer.from(value);
+  const expected = Buffer.from(config.adminMasterPassword);
+
+  if (supplied.length !== expected.length) return false;
+
+  return crypto.timingSafeEqual(supplied, expected);
+}
+
+const requireAdminManagePassword: express.RequestHandler = (
+  req,
+  res,
+  next,
+) => {
+  if (!config.adminMasterPassword) {
+    return res.status(503).json({
+      error:
+        "Admin management password is not configured on this server.",
+    });
+  }
+
+  const supplied = req.get("x-admin-manage-password");
+  if (!isValidAdminManagePassword(supplied)) {
+    return res.status(403).json({
+      error: "Enter the main admin password.",
+    });
+  }
+
+  next();
+};
+
 function requestBody(req: express.Request): Record<string, unknown> {
   return (req.body ?? {}) as Record<string, unknown>;
 }
@@ -138,6 +174,99 @@ router.get(
       },
       recentEntries: recent.rows.map(toEntry),
     });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Admin management (main admin password required)
+// ---------------------------------------------------------------------------
+
+router.get(
+  "/admins",
+  requireAdminManagePassword,
+  asyncHandler(async (_req, res) => {
+    const { rows } = await pool.query<StaffUserRow>(
+      `SELECT id, name, username, role, department, is_active, last_login_at, created_at
+       FROM staff_users
+       WHERE role = 'admin'
+       ORDER BY created_at ASC`,
+    );
+    return res.json({ admins: rows.map(toUser) });
+  }),
+);
+
+router.post(
+  "/admins",
+  requireAdminManagePassword,
+  asyncHandler(async (req, res) => {
+    const body = requestBody(req);
+    const name = validateName(body.name, "Admin name");
+    const username = validateUsername(body.username);
+    const password = validatePassword(body.password);
+
+    if (!name.ok) return res.status(400).json({ error: name.error });
+    if (!username.ok) return res.status(400).json({ error: username.error });
+    if (!password.ok) return res.status(400).json({ error: password.error });
+
+    const passwordHash = await bcrypt.hash(password.value, 10);
+
+    try {
+      const { rows } = await pool.query<StaffUserRow>(
+        `INSERT INTO staff_users (name, username, password_hash, role, department)
+         VALUES ($1, $2, $3, 'admin', NULL)
+         RETURNING id, name, username, role, department, is_active, last_login_at, created_at`,
+        [name.value, username.value, passwordHash],
+      );
+      return res.status(201).json({ admin: toUser(rows[0]) });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return res
+          .status(409)
+          .json({ error: "That login ID is already in use." });
+      }
+      throw error;
+    }
+  }),
+);
+
+router.delete(
+  "/admins/:id",
+  requireAdminManagePassword,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isUuid(id)) {
+      return res.status(400).json({ error: "Invalid admin ID." });
+    }
+
+    const existing = await pool.query<Pick<StaffUserRow, "id" | "name">>(
+      "SELECT id, name FROM staff_users WHERE id = $1 AND role = 'admin'",
+      [id],
+    );
+    if (!existing.rows[0]) {
+      return res.status(404).json({ error: "Admin not found." });
+    }
+
+    const authenticated = getAuthenticatedUser(req);
+    if (authenticated.id === id) {
+      return res.status(409).json({
+        error: "You cannot delete your own admin account.",
+      });
+    }
+
+    const count = await pool.query<CountRow>(
+      "SELECT count(*)::int AS count FROM staff_users WHERE role = 'admin'",
+    );
+    if ((count.rows[0]?.count ?? 0) <= 1) {
+      return res.status(409).json({
+        error: "At least one admin account must remain.",
+      });
+    }
+
+    await pool.query(
+      "DELETE FROM staff_users WHERE id = $1 AND role = 'admin'",
+      [id],
+    );
+    return res.status(204).end();
   }),
 );
 

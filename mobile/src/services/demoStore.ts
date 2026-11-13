@@ -630,6 +630,27 @@ export const demoDataSource: DataSource = {
     };
   },
 
+  async admins() {
+    throw new DemoError(
+      "Admin accounts can be managed only in live mode.",
+      403
+    );
+  },
+
+  async createAdmin() {
+    throw new DemoError(
+      "Admin accounts can be managed only in live mode.",
+      403
+    );
+  },
+
+  async deleteAdmin() {
+    throw new DemoError(
+      "Admin accounts can be managed only in live mode.",
+      403
+    );
+  },
+
   async managers() {
     const db = await getDatabase();
     requireAdmin(db);

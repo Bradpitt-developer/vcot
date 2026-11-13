@@ -1,6 +1,8 @@
 import { API_URL } from "../constants/config";
 import type {
+  AdminAccount,
   AdminDashboardData,
+  CreateAdminInput,
   CreateEmployeeInput,
   CreateManagerInput,
   CreateOperationInput,
@@ -20,6 +22,7 @@ import { getSessionToken } from "./session";
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  headers?: Record<string, string>;
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -40,6 +43,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         Accept: "application/json",
         ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
@@ -123,6 +127,29 @@ export const liveDataSource: DataSource = {
 
   async adminDashboard(): Promise<AdminDashboardData> {
     return request<AdminDashboardData>("/admin/dashboard");
+  },
+
+  async admins(masterPassword): Promise<AdminAccount[]> {
+    const result = await request<{ admins: AdminAccount[] }>("/admin/admins", {
+      headers: { "x-admin-manage-password": masterPassword },
+    });
+    return result.admins;
+  },
+
+  async createAdmin(input, masterPassword): Promise<AdminAccount> {
+    const result = await request<{ admin: AdminAccount }>("/admin/admins", {
+      method: "POST",
+      body: input,
+      headers: { "x-admin-manage-password": masterPassword },
+    });
+    return result.admin;
+  },
+
+  async deleteAdmin(id, masterPassword) {
+    await request<unknown>(`/admin/admins/${id}`, {
+      method: "DELETE",
+      headers: { "x-admin-manage-password": masterPassword },
+    });
   },
 
   async managers(): Promise<Manager[]> {

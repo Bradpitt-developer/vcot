@@ -11,6 +11,7 @@ function fail(message: string): never {
 }
 
 const databaseUrl = process.env.DATABASE_URL;
+const adminMasterPassword = process.env.ADMIN_MASTER_PASSWORD?.trim();
 if (!databaseUrl) {
   fail("DATABASE_URL is missing. Copy .env.example to .env.");
 }
@@ -41,6 +42,7 @@ export const config = {
     "7d") as NonNullable<SignOptions["expiresIn"]>,
   corsOrigin: process.env.CORS_ORIGIN || "*",
   appTimezone: "Asia/Kolkata",
+  adminMasterPassword,
 } as const;
 
 if (isProduction && databaseSsl && !strictSsl) {

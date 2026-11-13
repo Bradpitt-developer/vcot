@@ -11,6 +11,23 @@ export type SessionUser = {
   createdAt?: string;
 };
 
+export type AdminAccount = {
+  id: string;
+  name: string;
+  username: string;
+  role: "admin";
+  department: null;
+  isActive: boolean;
+  createdAt: string;
+  lastLoginAt?: string | null;
+};
+
+export type CreateAdminInput = {
+  name: string;
+  username: string;
+  password: string;
+};
+
 export type Manager = {
   id: string;
   name: string;
@@ -135,6 +152,12 @@ export type DataSource = {
   createWorkEntry(input: CreateWorkEntryInput): Promise<WorkEntry>;
 
   adminDashboard(): Promise<AdminDashboardData>;
+  admins(masterPassword: string): Promise<AdminAccount[]>;
+  createAdmin(
+    input: CreateAdminInput,
+    masterPassword: string,
+  ): Promise<AdminAccount>;
+  deleteAdmin(id: string, masterPassword: string): Promise<void>;
   managers(): Promise<Manager[]>;
   createManager(input: CreateManagerInput): Promise<Manager>;
   updateManager(id: string, input: UpdateManagerInput): Promise<Manager>;
