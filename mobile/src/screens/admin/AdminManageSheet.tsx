@@ -306,7 +306,7 @@ export function AdminManageSheet({ visible, onClose, currentUserId }: Props) {
                       required
                       value={name}
                       onChangeText={setName}
-                      placeholder="e.g. Anjali Sharma"
+                      placeholder="e.g. Rohan Kumar"
                       autoCapitalize="words"
                     />
                     <TextField
@@ -314,7 +314,7 @@ export function AdminManageSheet({ visible, onClose, currentUserId }: Props) {
                       required
                       value={username}
                       onChangeText={(value) => setUsername(value.toLowerCase())}
-                      placeholder="e.g. anjali.admin"
+                      placeholder="e.g. rohan.admin"
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
