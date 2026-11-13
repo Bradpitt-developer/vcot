@@ -10,6 +10,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "silaisaathi",
   icon: "./assets/icon.png",
   plugins: ["expo-sharing", "expo-mail-composer"],
+  extra: {
+    ...config.extra,
+    eas: {
+      projectId: "915dbc26-a95c-4031-bdbc-5584f67081cc",
+    },
+  },
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.silaisaathi.app",
