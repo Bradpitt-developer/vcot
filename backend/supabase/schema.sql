@@ -51,6 +51,24 @@ CREATE INDEX IF NOT EXISTS employees_department_active_idx
   ON public.employees (department, is_active, name);
 
 -- ---------------------------------------------------------------------------
+-- Employee-to-operation assignments used by Petticoat workflow filtering
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.employee_operations (
+  employee_id uuid NOT NULL,
+  operation_id uuid NOT NULL,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (employee_id, operation_id),
+  CONSTRAINT employee_operations_employee_fkey
+    FOREIGN KEY (employee_id) REFERENCES public.employees (id) ON DELETE CASCADE,
+  CONSTRAINT employee_operations_operation_fkey
+    FOREIGN KEY (operation_id) REFERENCES public.operations (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS employee_operations_operation_idx
+  ON public.employee_operations (operation_id, employee_id);
+
+-- ---------------------------------------------------------------------------
 -- Operations available in each department
 -- ---------------------------------------------------------------------------
 
@@ -200,9 +218,11 @@ ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.work_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_lots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_operations ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.staff_users IS 'Admin and Petticoat/RMG manager login accounts.';
 COMMENT ON TABLE public.employees IS 'Employees shown in the manager work-entry dropdown.';
+COMMENT ON TABLE public.employee_operations IS 'Operation categories assigned to each employee.';
 COMMENT ON TABLE public.operations IS 'Department-specific operations shown in the manager dropdown.';
 COMMENT ON TABLE public.work_entries IS 'Production entries submitted by managers.';
 COMMENT ON TABLE public.production_lots IS 'Guided Petticoat production lot cycles from Cutting through Folding.';

@@ -25,6 +25,7 @@ export interface Employee {
   department: Department;
   isActive: boolean;
   createdAt: string;
+  operations: Operation[];
 }
 
 export interface Operation {

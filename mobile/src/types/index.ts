@@ -45,6 +45,7 @@ export type Employee = {
   department: Department;
   isActive: boolean;
   createdAt: string;
+  operations: Operation[];
 };
 
 export type Operation = {
@@ -142,12 +143,14 @@ export type UpdateManagerInput = {
 export type CreateEmployeeInput = {
   name: string;
   department: Department;
+  operationIds?: string[];
 };
 
 export type UpdateEmployeeInput = {
   name?: string;
   department?: Department;
   isActive?: boolean;
+  operationIds?: string[];
 };
 
 export type CreateOperationInput = {

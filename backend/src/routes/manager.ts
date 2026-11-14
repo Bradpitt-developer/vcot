@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { asyncHandler } from "../utils/http";
 import { ENTRY_SELECT, TODAY_FILTER } from "../utils/queries";
+import { loadEmployeeOperations } from "../utils/employee-operations";
 import { toEmployee, toEntry, toOperation } from "../utils/serializers";
 import {
   cleanText,
@@ -86,8 +87,15 @@ router.get(
       ),
     ]);
 
+    const operationMap = await loadEmployeeOperations(
+      pool,
+      employees.rows.map((row) => row.id),
+    );
+
     res.json({
-      employees: employees.rows.map(toEmployee),
+      employees: employees.rows.map((row) =>
+        toEmployee(row, operationMap.get(row.id) ?? []),
+      ),
       operations: operations.rows.map(toOperation),
       entries: entries.rows.map(toEntry),
       stats: {

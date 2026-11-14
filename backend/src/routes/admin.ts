@@ -17,6 +17,11 @@ import type {
 import { asyncHandler } from "../utils/http";
 import { ENTRY_SELECT, TODAY_FILTER } from "../utils/queries";
 import {
+  loadEmployeeOperations,
+  replaceEmployeeOperations,
+  validateOperationIds,
+} from "../utils/employee-operations";
+import {
   toEmployee,
   toEntry,
   toOperation,
@@ -468,7 +473,16 @@ router.get(
        ORDER BY is_active DESC, department ASC, name ASC`,
       [department],
     );
-    res.json({ employees: rows.map(toEmployee) });
+    const operationMap = await loadEmployeeOperations(
+      pool,
+      rows.map((row) => row.id),
+    );
+
+    res.json({
+      employees: rows.map((row) =>
+        toEmployee(row, operationMap.get(row.id) ?? []),
+      ),
+    });
   }),
 );
 
@@ -484,18 +498,49 @@ router.post(
       return res.status(400).json({ error: department.error });
     }
 
-    const { rows } = await pool.query<EmployeeRow>(
-      `INSERT INTO employees (name, department)
-       VALUES ($1, $2)
-       RETURNING id, name, department, is_active, created_at`,
-      [name.value, department.value],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const employee = rows[0];
-    if (!employee) {
-      throw new Error("Employee was not returned after creation.");
+      const operationIds = await validateOperationIds(
+        client,
+        body.operationIds,
+        department.value,
+      );
+      if (!operationIds.ok) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: operationIds.error });
+      }
+
+      const { rows } = await client.query<EmployeeRow>(
+        `INSERT INTO employees (name, department)
+         VALUES ($1, $2)
+         RETURNING id, name, department, is_active, created_at`,
+        [name.value, department.value],
+      );
+
+      const employee = rows[0];
+      if (!employee) {
+        throw new Error("Employee was not returned after creation.");
+      }
+
+      await replaceEmployeeOperations(
+        client,
+        employee.id,
+        operationIds.value,
+      );
+      await client.query("COMMIT");
+
+      const operationMap = await loadEmployeeOperations(pool, [employee.id]);
+      return res.status(201).json({
+        employee: toEmployee(employee, operationMap.get(employee.id) ?? []),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-    return res.status(201).json({ employee: toEmployee(employee) });
   }),
 );
 
@@ -508,54 +553,143 @@ router.patch(
     }
 
     const body = requestBody(req);
-    const sets: string[] = [];
-    const values: unknown[] = [];
 
-    if (body.name !== undefined) {
-      const name = validateName(body.name, "Employee name");
-      if (!name.ok) return res.status(400).json({ error: name.error });
-      values.push(name.value);
-      sets.push(`name = $${values.length}`);
-    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (body.department !== undefined) {
-      const department = validateDepartment(body.department);
-      if (!department.ok) {
-        return res.status(400).json({ error: department.error });
+      const existingResult = await client.query<EmployeeRow>(
+        `SELECT id, name, department, is_active, created_at
+         FROM employees
+         WHERE id = $1
+         FOR UPDATE`,
+        [id],
+      );
+      const existing = existingResult.rows[0];
+      if (!existing) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Employee not found." });
       }
-      values.push(department.value);
-      sets.push(`department = $${values.length}`);
-    }
 
-    if (body.isActive !== undefined) {
-      if (typeof body.isActive !== "boolean") {
-        return res
-          .status(400)
-          .json({ error: "isActive must be true or false." });
+      let desiredDepartment: Department = existing.department;
+      const sets: string[] = [];
+      const values: unknown[] = [];
+
+      if (body.name !== undefined) {
+        const name = validateName(body.name, "Employee name");
+        if (!name.ok) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ error: name.error });
+        }
+        values.push(name.value);
+        sets.push(`name = $${values.length}`);
       }
-      values.push(body.isActive);
-      sets.push(`is_active = $${values.length}`);
+
+      if (body.department !== undefined) {
+        const department = validateDepartment(body.department);
+        if (!department.ok) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ error: department.error });
+        }
+        desiredDepartment = department.value;
+        values.push(department.value);
+        sets.push(`department = $${values.length}`);
+      }
+
+      if (body.isActive !== undefined) {
+        if (typeof body.isActive !== "boolean") {
+          await client.query("ROLLBACK");
+          return res
+            .status(400)
+            .json({ error: "isActive must be true or false." });
+        }
+        values.push(body.isActive);
+        sets.push(`is_active = $${values.length}`);
+      }
+
+      const requestedOperations =
+        body.operationIds !== undefined ? body.operationIds : undefined;
+      const shouldValidateOperations =
+        requestedOperations !== undefined ||
+        desiredDepartment !== existing.department;
+
+      let operationIdsResult: Awaited<
+        ReturnType<typeof validateOperationIds>
+      > = { ok: true, value: [] };
+
+      if (shouldValidateOperations) {
+        if (
+          requestedOperations === undefined &&
+          desiredDepartment === "RMG"
+        ) {
+          operationIdsResult = { ok: true, value: [] };
+        } else if (
+          requestedOperations === undefined &&
+          desiredDepartment === "PETTICOAT" &&
+          existing.department === "RMG"
+        ) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            error: "Select at least one operation for this Petticoat employee.",
+          });
+        } else {
+          operationIdsResult = await validateOperationIds(
+            client,
+            requestedOperations,
+            desiredDepartment,
+          );
+        }
+      }
+
+      if (!operationIdsResult.ok) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: operationIdsResult.error });
+      }
+
+      if (sets.length === 0 && !shouldValidateOperations) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "No valid changes supplied." });
+      }
+
+      let updated: EmployeeRow = existing;
+
+      if (sets.length > 0) {
+        sets.push("updated_at = NOW()");
+        values.push(id);
+
+        const { rows } = await client.query<EmployeeRow>(
+          `UPDATE employees
+           SET ${sets.join(", ")}
+           WHERE id = $${values.length}
+           RETURNING id, name, department, is_active, created_at`,
+          values,
+        );
+        if (!rows[0]) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ error: "Employee not found." });
+        }
+        updated = rows[0];
+      }
+
+      if (shouldValidateOperations) {
+        await replaceEmployeeOperations(
+          client,
+          updated.id,
+          operationIdsResult.value,
+        );
+      }
+
+      await client.query("COMMIT");
+      const operationMap = await loadEmployeeOperations(pool, [updated.id]);
+      return res.json({
+        employee: toEmployee(updated, operationMap.get(updated.id) ?? []),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    if (sets.length === 0) {
-      return res.status(400).json({ error: "No valid changes supplied." });
-    }
-
-    sets.push("updated_at = NOW()");
-    values.push(id);
-
-    const { rows } = await pool.query<EmployeeRow>(
-      `UPDATE employees
-       SET ${sets.join(", ")}
-       WHERE id = $${values.length}
-       RETURNING id, name, department, is_active, created_at`,
-      values,
-    );
-
-    if (!rows[0]) {
-      return res.status(404).json({ error: "Employee not found." });
-    }
-    return res.json({ employee: toEmployee(rows[0]) });
   }),
 );
 

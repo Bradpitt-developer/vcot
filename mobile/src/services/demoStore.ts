@@ -165,6 +165,7 @@ function seedDatabase(): DemoDatabase {
       department: "PETTICOAT",
       isActive: true,
       createdAt: daysAgo(35),
+      operations: [],
     },
     {
       id: "emp_meena",
@@ -172,6 +173,7 @@ function seedDatabase(): DemoDatabase {
       department: "PETTICOAT",
       isActive: true,
       createdAt: daysAgo(32),
+      operations: [],
     },
     {
       id: "emp_rahul",
@@ -179,6 +181,7 @@ function seedDatabase(): DemoDatabase {
       department: "PETTICOAT",
       isActive: true,
       createdAt: daysAgo(28),
+      operations: [],
     },
     {
       id: "emp_pooja",
@@ -186,6 +189,7 @@ function seedDatabase(): DemoDatabase {
       department: "RMG",
       isActive: true,
       createdAt: daysAgo(26),
+      operations: [],
     },
     {
       id: "emp_vikas",
@@ -193,6 +197,7 @@ function seedDatabase(): DemoDatabase {
       department: "RMG",
       isActive: true,
       createdAt: daysAgo(22),
+      operations: [],
     },
     {
       id: "emp_neha",
@@ -200,6 +205,7 @@ function seedDatabase(): DemoDatabase {
       department: "RMG",
       isActive: true,
       createdAt: daysAgo(18),
+      operations: [],
     },
   ];
 
@@ -214,6 +220,30 @@ function seedDatabase(): DemoDatabase {
       createdAt: daysAgo(44 - index),
     }))
   );
+
+  const operationByName = new Map(
+    operations.map((operation) => [
+      `${operation.department}:${operation.name}`,
+      operation,
+    ]),
+  );
+  const petticoatOperation = (name: string) =>
+    operationByName.get(`PETTICOAT:${name}`);
+
+  employees[0].operations = [
+    petticoatOperation("Cutting"),
+    petticoatOperation("Kamarpatti"),
+    petticoatOperation("Bottom"),
+  ].filter((operation): operation is Operation => Boolean(operation));
+  employees[1].operations = [
+    petticoatOperation("Interlock"),
+    petticoatOperation("Dori"),
+  ].filter((operation): operation is Operation => Boolean(operation));
+  employees[2].operations = [
+    petticoatOperation("Nada"),
+    petticoatOperation("Dhoka"),
+    petticoatOperation("Folding"),
+  ].filter((operation): operation is Operation => Boolean(operation));
 
   const entries: WorkEntry[] = [
     {
@@ -416,6 +446,16 @@ async function getDatabase(): Promise<DemoDatabase> {
         Array.isArray(parsed.operations) &&
         Array.isArray(parsed.entries)
       ) {
+        const normalizedEmployees = (parsed.employees as Array<
+          Employee & { operations?: Operation[] }
+        >);
+        parsed.employees = normalizedEmployees.map((employee) => ({
+          ...employee,
+          operations: Array.isArray(employee.operations)
+            ? employee.operations
+            : [],
+        }));
+
         if (parsed.version === 1) {
           migrateOperations(parsed);
           parsed.version = 2;
@@ -1031,12 +1071,30 @@ export const demoDataSource: DataSource = {
   async createEmployee(input) {
     const db = await getDatabase();
     requireAdmin(db);
+    const operationIds = Array.isArray(input.operationIds)
+      ? input.operationIds
+      : [];
+    const department = validateDepartment(input.department);
+
+    if (department === "PETTICOAT" && operationIds.length === 0) {
+      throw new DemoError(
+        "Select at least one operation for this Petticoat employee.",
+        400
+      );
+    }
+
     const employee: Employee = {
       id: makeId("emp"),
       name: validateName(input.name, "Employee name"),
-      department: validateDepartment(input.department),
+      department,
       isActive: true,
       createdAt: new Date().toISOString(),
+      operations:
+        department === "PETTICOAT"
+          ? db.operations.filter((operation) =>
+              operationIds.includes(operation.id)
+            )
+          : [],
     };
     db.employees.push(employee);
     await persist(db);
@@ -1057,6 +1115,21 @@ export const demoDataSource: DataSource = {
     }
     if (input.isActive !== undefined) {
       employee.isActive = Boolean(input.isActive);
+    }
+    if (input.operationIds !== undefined) {
+      const department = employee.department;
+      if (department === "PETTICOAT" && input.operationIds.length === 0) {
+        throw new DemoError(
+          "Select at least one operation for this Petticoat employee.",
+          400
+        );
+      }
+      employee.operations =
+        department === "PETTICOAT"
+          ? db.operations.filter((operation) =>
+              input.operationIds?.includes(operation.id)
+            )
+          : [];
     }
 
     await persist(db);

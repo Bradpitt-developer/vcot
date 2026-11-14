@@ -39,13 +39,17 @@ export function toUser(
   };
 }
 
-export function toEmployee(row: EmployeeRow): Employee {
+export function toEmployee(
+  row: EmployeeRow,
+  operations: Operation[] = [],
+): Employee {
   return {
     id: row.id,
     name: row.name,
     department: row.department,
     isActive: row.is_active,
     createdAt: toIso(row.created_at),
+    operations,
   };
 }
 

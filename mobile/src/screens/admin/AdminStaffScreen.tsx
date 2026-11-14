@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Search, Trash2, KeyRound, X } from "lucide-react-native";
+import { Plus, Search, Trash2, KeyRound, ClipboardList, X } from "lucide-react-native";
 
 import { Avatar } from "../../components/Avatar";
 import { IconButton, PrimaryButton } from "../../components/Buttons";
@@ -30,7 +30,7 @@ import type {
   AdminTabParamList,
 } from "../../navigation/types";
 import { data } from "../../services/data";
-import type { Employee, Manager } from "../../types";
+import type { Employee, Manager, Operation } from "../../types";
 import { confirmAction } from "../../utils/confirm";
 import { errorMessage } from "../../utils/format";
 
@@ -42,12 +42,18 @@ export function AdminStaffScreen({ navigation }: Props) {
   const [segment, setSegment] = useState<Segment>("managers");
   const [managers, setManagers] = useState<Manager[] | null>(null);
   const [employees, setEmployees] = useState<Employee[] | null>(null);
+  const [operations, setOperations] = useState<Operation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [resetManager, setResetManager] = useState<Manager | null>(null);
+  const [editOperationsEmployee, setEditOperationsEmployee] =
+    useState<Employee | null>(null);
+  const [selectedOperationIds, setSelectedOperationIds] = useState<string[]>([]);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [savingOperations, setSavingOperations] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -62,12 +68,19 @@ export function AdminStaffScreen({ navigation }: Props) {
     else if (!loadedOnce.current) setLoading(true);
 
     try {
-      const [managerList, employeeList] = await Promise.all([
+      const [managerList, employeeList, operationList] = await Promise.all([
         data.managers(),
         data.employees(),
+        data.operations(),
       ]);
       setManagers(managerList);
       setEmployees(employeeList);
+      setOperations(
+        operationList.filter(
+          (operation) =>
+            operation.isActive && operation.department === "PETTICOAT"
+        )
+      );
       setError(null);
       loadedOnce.current = true;
     } catch (loadError) {
@@ -187,6 +200,53 @@ export function AdminStaffScreen({ navigation }: Props) {
     }
   }
 
+  function openEmployeeOperationsEdit(employee: Employee) {
+    if (employee.department !== "PETTICOAT") {
+      showToast("Operation assignments are for Petticoat employees only.", "info");
+      return;
+    }
+
+    setEditOperationsEmployee(employee);
+    setSelectedOperationIds(employee.operations.map((operation) => operation.id));
+    setOperationError(null);
+  }
+
+  function closeEmployeeOperationsEdit() {
+    setEditOperationsEmployee(null);
+    setSelectedOperationIds([]);
+    setOperationError(null);
+    setSavingOperations(false);
+  }
+
+  async function saveEmployeeOperations() {
+    if (!editOperationsEmployee) return;
+
+    if (selectedOperationIds.length === 0) {
+      setOperationError("Select at least one operation for this employee.");
+      return;
+    }
+
+    setSavingOperations(true);
+    setOperationError(null);
+
+    try {
+      const updated = await data.updateEmployee(editOperationsEmployee.id, {
+        operationIds: selectedOperationIds,
+      });
+      setEmployees((current) =>
+        (current || []).map((item) =>
+          item.id === updated.id ? updated : item
+        )
+      );
+      showToast(`${updated.name}'s operations updated.`, "success");
+      closeEmployeeOperationsEdit();
+    } catch (operationUpdateError) {
+      setOperationError(errorMessage(operationUpdateError));
+    } finally {
+      setSavingOperations(false);
+    }
+  }
+
   async function confirmEmployeeDelete(employee: Employee) {
     const confirmed = await confirmAction({
       title: "Delete employee?",
@@ -210,7 +270,7 @@ export function AdminStaffScreen({ navigation }: Props) {
     }
   }
 
-  const listData =
+  const listData: Array<Manager | Employee> =
     segment === "managers" ? filteredManagers : filteredEmployees;
 
   return (
@@ -372,15 +432,22 @@ export function AdminStaffScreen({ navigation }: Props) {
           renderItem={({ item }) =>
             segment === "managers" ? (
               <ManagerRow
-                manager={item as Manager}
+                manager={item as unknown as Manager}
                 busy={busyId === item.id}
-                onResetPassword={() => openManagerPasswordReset(item as Manager)}
-                onDelete={() => void confirmManagerDelete(item as Manager)}
+                onResetPassword={() =>
+                  openManagerPasswordReset(item as unknown as Manager)
+                }
+                onDelete={() =>
+                  void confirmManagerDelete(item as unknown as Manager)
+                }
               />
             ) : (
               <EmployeeRow
                 employee={item as Employee}
                 busy={busyId === item.id}
+                onEditOperations={() =>
+                  openEmployeeOperationsEdit(item as Employee)
+                }
                 onDelete={() => void confirmEmployeeDelete(item as Employee)}
               />
             )
@@ -507,6 +574,129 @@ export function AdminStaffScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={Boolean(editOperationsEmployee)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEmployeeOperationsEdit}
+      >
+        <View style={styles.resetBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close operations editor"
+            style={StyleSheet.absoluteFill}
+            onPress={closeEmployeeOperationsEdit}
+          />
+          <View style={styles.resetCard}>
+            <View style={styles.resetHeader}>
+              <View style={styles.resetHeaderIcon}>
+                <ClipboardList
+                  size={20}
+                  color={colors.primaryDark}
+                  strokeWidth={2.2}
+                />
+              </View>
+              <View style={styles.resetHeaderText}>
+                <Text style={styles.resetTitle}>Edit Petticoat operations</Text>
+                <Text style={styles.resetSubtitle} numberOfLines={1}>
+                  {editOperationsEmployee?.name}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close operations editor"
+                onPress={closeEmployeeOperationsEdit}
+                style={({ pressed }) => [
+                  styles.resetCloseButton,
+                  pressed && styles.resetCloseButtonPressed,
+                ]}
+              >
+                <X size={18} color={colors.muted} strokeWidth={2.3} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.resetContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.operationPickerHint}>
+                This employee will appear only for the operations selected below.
+              </Text>
+              <View style={styles.operationWrap}>
+                {operations.map((operation) => {
+                  const selected = selectedOperationIds.includes(operation.id);
+
+                  return (
+                    <Pressable
+                      key={operation.id}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      onPress={() => {
+                        setSelectedOperationIds((current) =>
+                          current.includes(operation.id)
+                            ? current.filter((id) => id !== operation.id)
+                            : [...current, operation.id]
+                        );
+                        setOperationError(null);
+                      }}
+                      style={({ pressed }) => [
+                        styles.operationChip,
+                        selected && styles.operationChipSelected,
+                        { opacity: pressed ? 0.75 : 1 },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.operationChipText,
+                          selected && styles.operationChipTextSelected,
+                        ]}
+                      >
+                        {operation.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {operations.length === 0 ? (
+                  <Text style={styles.noOperationText}>
+                    No active Petticoat operations are available. Add them from Setup.
+                  </Text>
+                ) : null}
+              </View>
+
+              <ErrorBanner message={operationError} />
+              <View style={styles.resetActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel operations edit"
+                  disabled={savingOperations}
+                  onPress={closeEmployeeOperationsEdit}
+                  style={({ pressed }) => [
+                    styles.cancelButton,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <PrimaryButton
+                  label="Save operations"
+                  onPress={() => void saveEmployeeOperations()}
+                  loading={savingOperations}
+                  disabled={selectedOperationIds.length === 0}
+                  icon={
+                    <ClipboardList
+                      size={17}
+                      color={colors.white}
+                      strokeWidth={2.3}
+                    />
+                  }
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -574,10 +764,12 @@ function ManagerRow({
 function EmployeeRow({
   employee,
   busy,
+  onEditOperations,
   onDelete,
 }: {
   employee: Employee;
   busy: boolean;
+  onEditOperations: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -590,23 +782,50 @@ function EmployeeRow({
         <Text style={styles.personMeta} numberOfLines={1}>
           {employee.isActive ? "Active employee" : "Disabled employee"}
         </Text>
+        {employee.department === "PETTICOAT" ? (
+          <Text style={styles.operationMeta} numberOfLines={2}>
+            {employee.operations.length > 0
+              ? employee.operations.map((operation) => operation.name).join(" · ")
+              : "No operation assigned"}
+          </Text>
+        ) : null}
         <View style={styles.pillWrap}>
           <DepartmentPill department={employee.department} small />
         </View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Delete employee ${employee.name}`}
-        accessibilityState={{ disabled: busy }}
-        disabled={busy}
-        onPress={onDelete}
-        style={({ pressed }) => [
-          styles.deleteButton,
-          { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
-        ]}
-      >
-        <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
-      </Pressable>
+      <View style={styles.rowActions}>
+        {employee.department === "PETTICOAT" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Edit operations for ${employee.name}`}
+            disabled={busy}
+            onPress={onEditOperations}
+            style={({ pressed }) => [
+              styles.resetIconButton,
+              { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
+            ]}
+          >
+            <ClipboardList
+              size={17}
+              color={colors.primaryDark}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete employee ${employee.name}`}
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onPress={onDelete}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
+          ]}
+        >
+          <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -842,6 +1061,52 @@ const styles = StyleSheet.create({
   resetHint: {
     color: colors.faint,
     fontSize: 10,
+    lineHeight: 15,
+    fontWeight: "500",
+  },
+  operationMeta: {
+    color: colors.muted,
+    fontSize: 9.5,
+    fontWeight: "500",
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  operationPickerHint: {
+    color: colors.faint,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: "500",
+  },
+  operationWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  operationChip: {
+    minHeight: 36,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.canvas,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  operationChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  operationChipText: {
+    color: colors.body,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  operationChipTextSelected: {
+    color: colors.white,
+  },
+  noOperationText: {
+    color: colors.faint,
+    fontSize: 10.5,
     lineHeight: 15,
     fontWeight: "500",
   },

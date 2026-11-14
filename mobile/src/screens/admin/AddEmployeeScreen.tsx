@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,17 +11,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Info, UserRound } from "lucide-react-native";
+import { Info, UserRound, Check } from "lucide-react-native";
 
 import { PrimaryButton } from "../../components/Buttons";
 import { DepartmentPicker } from "../../components/DepartmentPicker";
-import { ErrorBanner, TextField } from "../../components/Form";
+import { ErrorBanner, FieldLabel, TextField } from "../../components/Form";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { colors, radii, spacing } from "../../constants/theme";
 import { useToast } from "../../context/ToastContext";
 import type { AdminStackParamList } from "../../navigation/types";
 import { data } from "../../services/data";
-import type { Department } from "../../types";
+import type { Department, Operation } from "../../types";
 import { errorMessage } from "../../utils/format";
 
 type Props = NativeStackScreenProps<AdminStackParamList, "AddEmployee">;
@@ -29,8 +30,43 @@ export function AddEmployeeScreen({ navigation }: Props) {
   const { showToast } = useToast();
   const [name, setName] = useState("");
   const [department, setDepartment] = useState<Department>("PETTICOAT");
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [operationsLoading, setOperationsLoading] = useState(true);
+  const [selectedOperationIds, setSelectedOperationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadOperations() {
+      try {
+        const result = await data.operations();
+        if (mounted) {
+          setOperations(
+            result.filter(
+              (operation) =>
+                operation.isActive && operation.department === "PETTICOAT"
+            )
+          );
+        }
+      } catch {
+        if (mounted) {
+          setOperations([]);
+        }
+      } finally {
+        if (mounted) {
+          setOperationsLoading(false);
+        }
+      }
+    }
+
+    void loadOperations();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function handleCreate() {
     Keyboard.dismiss();
@@ -42,11 +78,19 @@ export function AddEmployeeScreen({ navigation }: Props) {
       return;
     }
 
+    if (department === "PETTICOAT" && selectedOperationIds.length === 0) {
+      setError("Select at least one Petticoat operation for this employee.");
+      return;
+    }
+
     setLoading(true);
     try {
+      const operationIds =
+        department === "PETTICOAT" ? selectedOperationIds : undefined;
       const employee = await data.createEmployee({
         name: cleanName,
         department,
+        operationIds,
       });
       showToast(`${employee.name} added successfully.`, "success");
       navigation.goBack();
@@ -106,15 +150,85 @@ export function AddEmployeeScreen({ navigation }: Props) {
 
             <DepartmentPicker
               value={department}
-              onChange={setDepartment}
+              onChange={(value) => {
+                setDepartment(value);
+                setError(null);
+              }}
               label="Manager type / section"
             />
+
+            {department === "PETTICOAT" ? (
+              <View style={styles.operationsBlock}>
+                <FieldLabel
+                  label="Operations"
+                  required
+                  hint="This employee appears when the manager selects these operations"
+                />
+                {operationsLoading ? (
+                  <View style={styles.operationLoading}>
+                    <Text style={styles.operationLoadingText}>
+                      Loading operations…
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.operationWrap}>
+                    {operations.map((operation) => {
+                      const selected = selectedOperationIds.includes(operation.id);
+
+                      return (
+                        <Pressable
+                          key={operation.id}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: selected }}
+                          onPress={() => {
+                            setSelectedOperationIds((current) =>
+                              current.includes(operation.id)
+                                ? current.filter((id) => id !== operation.id)
+                                : [...current, operation.id]
+                            );
+                            setError(null);
+                          }}
+                          style={({ pressed }) => [
+                            styles.operationChip,
+                            selected && styles.operationChipSelected,
+                            { opacity: pressed ? 0.75 : 1 },
+                          ]}
+                        >
+                          {selected ? (
+                            <Check
+                              size={14}
+                              color={colors.white}
+                              strokeWidth={2.6}
+                            />
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.operationChipText,
+                              selected && styles.operationChipTextSelected,
+                            ]}
+                          >
+                            {operation.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    {operations.length === 0 ? (
+                      <Text style={styles.noOperations}>
+                        No active Petticoat operations are available. Add them
+                        from Setup first.
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
+              </View>
+            ) : null}
 
             <View style={styles.infoRow}>
               <Info size={15} color={colors.info} strokeWidth={2} />
               <Text style={styles.infoText}>
-                {department === "PETTICOAT" ? "Petticoat" : "RMG"} managers will be
-                able to select this employee when adding a work entry.
+                {department === "PETTICOAT"
+                  ? "Petticoat managers will see this employee only when they select one of the assigned operations."
+                  : "RMG managers will be able to select this employee when adding a work entry."}
               </Text>
             </View>
 
@@ -196,5 +310,52 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     color: colors.body,
+  },
+  operationsBlock: {
+    gap: spacing.sm,
+  },
+  operationLoading: {
+    paddingVertical: spacing.lg,
+    alignItems: "center",
+  },
+  operationLoadingText: {
+    fontSize: 11,
+    color: colors.muted,
+    fontWeight: "500",
+  },
+  operationWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  operationChip: {
+    minHeight: 34,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.canvas,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  operationChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  operationChipText: {
+    color: colors.body,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  operationChipTextSelected: {
+    color: colors.white,
+  },
+  noOperations: {
+    color: colors.faint,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "500",
+    paddingVertical: spacing.sm,
   },
 });

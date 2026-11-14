@@ -77,15 +77,36 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
     hint: "Next step",
   }));
 
-  const employeeOptions: SelectOption[] = home.employees.map((employee) => ({
+  const cuttingOperation = home.operations.find(
+    (operation) => operation.name.toLowerCase() === "cutting"
+  );
+
+  const filterOperationId = activeLot ? operationId : cuttingOperation?.id;
+
+  const visibleEmployees = filterOperationId
+    ? home.employees.filter((employee) =>
+        employee.operations.some((operation) => operation.id === filterOperationId)
+      )
+    : [];
+
+  const filteredEmployeeOptions: SelectOption[] = visibleEmployees.map((employee) => ({
     value: employee.id,
     label: employee.name,
-    hint: employee.department,
+    hint: employee.operations.map((operation) => operation.name).join(", "),
   }));
 
   const selectedOperation = operationId
     ? home.operations.find((operation) => operation.id === operationId)
     : undefined;
+
+  useEffect(() => {
+    if (
+      employeeId &&
+      !visibleEmployees.some((employee) => employee.id === employeeId)
+    ) {
+      setEmployeeId(null);
+    }
+  }, [employeeId, visibleEmployees]);
 
   useEffect(() => {
     if (
@@ -335,12 +356,12 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
             label="Assign employee"
             placeholder="Select employee"
             value={employeeId}
-            options={employeeOptions}
+            options={filteredEmployeeOptions}
             onChange={(value) => {
               setEmployeeId(value);
               setLotError(null);
             }}
-            emptyText="No employees in your section."
+            emptyText="No employees assigned to this operation. Admin can add them in People."
             icon={<UserRound size={17} color={colors.muted} strokeWidth={2} />}
           />
 
@@ -392,12 +413,12 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
             label="Assign to employee"
             placeholder="Select employee"
             value={employeeId}
-            options={employeeOptions}
+            options={filteredEmployeeOptions}
             onChange={(value) => {
               setEmployeeId(value);
               setLotError(null);
             }}
-            emptyText="No employees in your section."
+            emptyText="No employees assigned to this operation. Admin can add them in People."
             icon={<UserRound size={17} color={colors.muted} strokeWidth={2} />}
           />
 
