@@ -21,7 +21,7 @@ import { colors, radii, spacing } from "../../constants/theme";
 import { useToast } from "../../context/ToastContext";
 import type { AdminStackParamList } from "../../navigation/types";
 import { data } from "../../services/data";
-import type { Department, Operation } from "../../types";
+import type { Department, Employee, Operation } from "../../types";
 import { errorMessage } from "../../utils/format";
 
 type Props = NativeStackScreenProps<AdminStackParamList, "AddEmployee">;
@@ -32,6 +32,7 @@ export function AddEmployeeScreen({ navigation }: Props) {
   const [department, setDepartment] = useState<Department>("PETTICOAT");
   const [operations, setOperations] = useState<Operation[]>([]);
   const [operationsLoading, setOperationsLoading] = useState(true);
+  const [existingEmployees, setExistingEmployees] = useState<Employee[]>([]);
   const [selectedOperationIds, setSelectedOperationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,18 +42,28 @@ export function AddEmployeeScreen({ navigation }: Props) {
 
     async function loadOperations() {
       try {
-        const result = await data.operations();
+        const [operationResult, employeeResult] = await Promise.all([
+          data.operations(),
+          data.employees(),
+        ]);
         if (mounted) {
           setOperations(
-            result.filter(
+            operationResult.filter(
               (operation) =>
                 operation.isActive && operation.department === "PETTICOAT"
+            )
+          );
+          setExistingEmployees(
+            employeeResult.filter(
+              (employee) =>
+                employee.isActive && employee.department === "PETTICOAT"
             )
           );
         }
       } catch {
         if (mounted) {
           setOperations([]);
+          setExistingEmployees([]);
         }
       } finally {
         if (mounted) {
@@ -67,6 +78,38 @@ export function AddEmployeeScreen({ navigation }: Props) {
       mounted = false;
     };
   }, []);
+
+  const normalizedEmployeeName = name.trim().toLowerCase();
+  const assignedOperationIds = new Set(
+    existingEmployees
+      .filter(
+        (employee) => employee.name.trim().toLowerCase() === normalizedEmployeeName
+      )
+      .flatMap((employee) =>
+        employee.operations.map((operation) => operation.id)
+      )
+  );
+
+  useEffect(() => {
+    const disabledIds = new Set(
+      existingEmployees
+        .filter(
+          (employee) =>
+            employee.name.trim().toLowerCase() === normalizedEmployeeName
+        )
+        .flatMap((employee) =>
+          employee.operations.map((operation) => operation.id)
+        )
+    );
+
+    setSelectedOperationIds((current) =>
+      current.filter((id) => !disabledIds.has(id))
+    );
+  }, [existingEmployees, normalizedEmployeeName]);
+
+  const disabledOperationNames = operations
+    .filter((operation) => assignedOperationIds.has(operation.id))
+    .map((operation) => operation.name);
 
   async function handleCreate() {
     Keyboard.dismiss();
@@ -174,12 +217,17 @@ export function AddEmployeeScreen({ navigation }: Props) {
                   <View style={styles.operationWrap}>
                     {operations.map((operation) => {
                       const selected = selectedOperationIds.includes(operation.id);
+                      const disabled = assignedOperationIds.has(operation.id);
 
                       return (
                         <Pressable
                           key={operation.id}
                           accessibilityRole="checkbox"
-                          accessibilityState={{ checked: selected }}
+                          accessibilityState={{
+                            checked: selected,
+                            disabled,
+                          }}
+                          disabled={disabled}
                           onPress={() => {
                             setSelectedOperationIds((current) =>
                               current.includes(operation.id)
@@ -190,11 +238,14 @@ export function AddEmployeeScreen({ navigation }: Props) {
                           }}
                           style={({ pressed }) => [
                             styles.operationChip,
+                            disabled && styles.operationChipDisabled,
                             selected && styles.operationChipSelected,
-                            { opacity: pressed ? 0.75 : 1 },
+                            {
+                              opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
+                            },
                           ]}
                         >
-                          {selected ? (
+                          {selected && !disabled ? (
                             <Check
                               size={14}
                               color={colors.white}
@@ -205,6 +256,7 @@ export function AddEmployeeScreen({ navigation }: Props) {
                             style={[
                               styles.operationChipText,
                               selected && styles.operationChipTextSelected,
+                              disabled && styles.operationChipTextDisabled,
                             ]}
                           >
                             {operation.name}
@@ -212,6 +264,12 @@ export function AddEmployeeScreen({ navigation }: Props) {
                         </Pressable>
                       );
                     })}
+                    {disabledOperationNames.length > 0 ? (
+                      <Text style={styles.disabledOperationHint}>
+                        {disabledOperationNames.join(", ")} already assigned to this
+                        employee name. Choose another operation.
+                      </Text>
+                    ) : null}
                     {operations.length === 0 ? (
                       <Text style={styles.noOperations}>
                         No active Petticoat operations are available. Add them
@@ -342,6 +400,20 @@ const styles = StyleSheet.create({
   operationChipSelected: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+  },
+  operationChipDisabled: {
+    backgroundColor: colors.lineSoft,
+    borderColor: colors.line,
+  },
+  disabledOperationHint: {
+    color: colors.muted,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  operationChipTextDisabled: {
+    color: colors.faint,
   },
   operationChipText: {
     color: colors.body,
