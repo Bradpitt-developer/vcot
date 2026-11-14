@@ -1,28 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import {
   CheckCircle2,
-  ClipboardList,
   ClipboardPenLine,
   Lock,
-  Plus,
   UserRound,
 } from "lucide-react-native";
-import { useFocusEffect } from "@react-navigation/native";
 
 import { Avatar } from "../../components/Avatar";
 import { PrimaryButton } from "../../components/Buttons";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorBanner, FieldLabel, TextField } from "../../components/Form";
 import { QuantityStepper } from "../../components/QuantityStepper";
-import { SectionHeader } from "../../components/SectionHeader";
 import { SelectField, type SelectOption } from "../../components/SelectSheet";
 import { colors, radii, spacing } from "../../constants/theme";
 import { useToast } from "../../context/ToastContext";
@@ -48,11 +42,10 @@ const REQUIRED_OPERATIONS = [
 
 export function ProductionWorkflowCard({ home, onSaved }: Props) {
   const { showToast } = useToast();
-  const [lots, setLots] = useState<ProductionLot[] | null>(null);
-  const [lotLoading, setLotLoading] = useState(true);
+  const [activeLot, setActiveLot] = useState<ProductionLot | null>(null);
+  const [lotLoading, setLotLoading] = useState(false);
   const [lotError, setLotError] = useState<string | null>(null);
-  const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
-  const [showNewLot, setShowNewLot] = useState(false);
+  const [lotNo, setLotNo] = useState("");
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [operationId, setOperationId] = useState<string | null>(null);
   const [meter, setMeter] = useState("");
@@ -60,57 +53,8 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
   const [width, setWidth] = useState("");
   const [panel, setPanel] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [lotNo, setLotNo] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-
-  const loadLots = useCallback(async (showLoading = false) => {
-    if (showLoading) setLotLoading(true);
-
-    try {
-      const result = await data.managerLots();
-      setLots(result);
-      setLotError(null);
-
-      if (result.length > 0) {
-        setSelectedLotId((current) =>
-          current && result.some((lot) => lot.id === current)
-            ? current
-            : result[0].id
-        );
-      } else {
-        setSelectedLotId(null);
-      }
-    } catch (error) {
-      setLotError(errorMessage(error));
-    } finally {
-      setLotLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadLots();
-    }, [loadLots])
-  );
-
-  useEffect(() => {
-    if (lots && lots.length === 0) {
-      setShowNewLot(true);
-    }
-  }, [lots]);
-
-  useEffect(() => {
-    if (!lots) return;
-    if (employeeId && !home.employees.some((employee) => employee.id === employeeId)) {
-      setEmployeeId(null);
-    }
-  }, [home.employees, employeeId, lots]);
-
-  const selectedLot = useMemo(
-    () => lots?.find((lot) => lot.id === selectedLotId) ?? null,
-    [lots, selectedLotId]
-  );
 
   const operationMap = useMemo(
     () => new Map(home.operations.map((operation) => [operation.name.toLowerCase(), operation])),
@@ -119,13 +63,19 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
 
   const availableOperations = useMemo(
     () =>
-      selectedLot
-        ? selectedLot.availableOperations
+      activeLot
+        ? activeLot.availableOperations
             .map((name) => operationMap.get(name.toLowerCase()))
             .filter((operation): operation is (typeof home.operations)[number] => Boolean(operation))
         : [],
-    [home.operations, operationMap, selectedLot]
+    [activeLot, home.operations, operationMap]
   );
+
+  const operationOptions: SelectOption[] = availableOperations.map((operation) => ({
+    value: operation.id,
+    label: operation.name,
+    hint: "Next step",
+  }));
 
   const employeeOptions: SelectOption[] = home.employees.map((employee) => ({
     value: employee.id,
@@ -138,19 +88,78 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
     : undefined;
 
   useEffect(() => {
-    if (availableOperations.length === 0) {
-      setOperationId(null);
+    if (
+      activeLot &&
+      availableOperations.length > 0 &&
+      (!operationId ||
+        !availableOperations.some((operation) => operation.id === operationId))
+    ) {
+      setOperationId(availableOperations[0].id);
       return;
     }
 
-    if (!operationId || !availableOperations.some((operation) => operation.id === operationId)) {
-      setOperationId(availableOperations[0].id);
+    if (!activeLot) {
+      setOperationId(null);
     }
-  }, [availableOperations, operationId]);
+  }, [activeLot, availableOperations, operationId]);
+
+  useEffect(() => {
+    if (
+      employeeId &&
+      !home.employees.some((employee) => employee.id === employeeId)
+    ) {
+      setEmployeeId(null);
+    }
+  }, [employeeId, home.employees]);
+
+  useEffect(() => {
+    const trimmed = lotNo.trim();
+    let cancelled = false;
+
+    if (!trimmed) {
+      setActiveLot(null);
+      setLotLoading(false);
+      setLotError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = setTimeout(async () => {
+      setLotLoading(true);
+      setLotError(null);
+
+      try {
+        const result = await data.managerLot(trimmed);
+        if (!cancelled) {
+          setActiveLot(result);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setActiveLot(null);
+          setLotError(errorMessage(loadError));
+        }
+      } finally {
+        if (!cancelled) {
+          setLotLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [lotNo]);
 
   async function handleCreateLot() {
     if (!employeeId) {
       setLotError("Select an employee first.");
+      return;
+    }
+
+    if (!lotNo.trim()) {
+      setLotError("Enter the lot number.");
       return;
     }
 
@@ -160,11 +169,6 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
 
     if (numbers.some((value) => !Number.isFinite(value) || value < 0)) {
       setLotError("Meter, area, width and panel must be valid numbers.");
-      return;
-    }
-
-    if (!lotNo.trim()) {
-      setLotError("Enter the lot number.");
       return;
     }
 
@@ -194,22 +198,19 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
       setWidth("");
       setPanel("");
       setRemarks("");
-      setLotNo("");
       setQuantity(1);
-      setShowNewLot(false);
-      await loadLots();
-      setSelectedLotId(lot.id);
+      setActiveLot(lot);
       onSaved();
-    } catch (error) {
-      setLotError(errorMessage(error));
+    } catch (createError) {
+      setLotError(errorMessage(createError));
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleCompleteStep() {
-    if (!selectedLot) {
-      setLotError("Select an active lot first.");
+    if (!activeLot) {
+      setLotError("Enter an active lot number first.");
       return;
     }
 
@@ -223,7 +224,7 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
 
     try {
       const updated = await data.completeProductionStep({
-        lotId: selectedLot.id,
+        lotId: activeLot.id,
         employeeId,
         operationId,
       });
@@ -234,21 +235,22 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
           : `${selectedOperation?.name || "Step"} saved for lot ${updated.lotNo}.`,
         "success"
       );
-      await loadLots();
+
+      if (updated.status === "completed") {
+        setActiveLot(null);
+      } else {
+        setActiveLot(updated);
+      }
       onSaved();
-    } catch (error) {
-      setLotError(errorMessage(error));
+    } catch (completeError) {
+      setLotError(errorMessage(completeError));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const completed = new Set(selectedLot?.completedOperations || []);
-  const operationOptions: SelectOption[] = availableOperations.map((operation) => ({
-    value: operation.id,
-    label: operation.name,
-    hint: "Next step",
-  }));
+  const shownLotNo = lotNo.trim();
+  const completed = new Set(activeLot?.completedOperations || []);
 
   return (
     <View style={styles.workflowCard}>
@@ -259,25 +261,32 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
         <View style={styles.workflowHeaderText}>
           <Text style={styles.workflowTitle}>Production workflow</Text>
           <Text style={styles.workflowSubtitle}>
-            Cutting to Folding · quantity stays locked
+            Enter the lot number to continue or start it
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={showNewLot ? "Hide new lot form" : "Start a new lot"}
-          onPress={() => {
-            setShowNewLot((current) => !current);
-            setLotError(null);
-          }}
-          style={({ pressed }) => [
-            styles.newLotButton,
-            showNewLot && styles.newLotButtonSelected,
-            { opacity: pressed ? 0.75 : 1 },
-          ]}
-        >
-          <Plus size={18} color={colors.white} strokeWidth={2.5} />
-        </Pressable>
       </View>
+
+      <TextField
+        label="Lot number"
+        required
+        value={lotNo}
+        onChangeText={(value) => {
+          setLotNo(value);
+          setLotError(null);
+        }}
+        placeholder="e.g. 7001"
+        autoCapitalize="characters"
+        autoCorrect={false}
+        maxLength={40}
+        returnKeyType="done"
+      />
+
+      {lotLoading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.loadingText}>Checking lot {shownLotNo}…</Text>
+        </View>
+      ) : null}
 
       {lotError ? (
         <View style={styles.errorWrap}>
@@ -285,72 +294,17 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
         </View>
       ) : null}
 
-      {lotLoading && !lots ? (
-        <View style={styles.loadingRow}>
-          <ActivityIndicator color={colors.primary} />
-          <Text style={styles.loadingText}>Loading active lots…</Text>
-        </View>
-      ) : null}
-
-      {lots && lots.length > 0 ? (
-        <View style={styles.lotPicker}>
-          <Text style={styles.fieldLabel}>Active lots</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.lotScroll}
-          >
-            {lots.map((lot) => {
-              const selected = lot.id === selectedLotId;
-              return (
-                <Pressable
-                  key={lot.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => setSelectedLotId(lot.id)}
-                  style={({ pressed }) => [
-                    styles.lotCard,
-                    selected && styles.lotCardSelected,
-                    { opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <View style={styles.lotCardTop}>
-                    <Text style={styles.lotNo}>{lot.lotNo}</Text>
-                    <View style={styles.lockBadge}>
-                      <Lock size={10} color={colors.muted} strokeWidth={2.4} />
-                      <Text style={styles.lockText}>{lot.quantity} pcs</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.lotStage}>Next: {lot.currentStage}</Text>
-                  <View style={styles.lotProgress}>
-                    {REQUIRED_OPERATIONS.map((step) => {
-                      const done = lot.completedOperations.includes(step);
-                      return (
-                        <View
-                          key={step}
-                          style={[styles.progressDot, done && styles.progressDotDone]}
-                        />
-                      );
-                    })}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {selectedLot ? (
+      {activeLot ? (
         <View style={styles.stepSection}>
           <View style={styles.divider} />
           <View style={styles.stepHeader}>
             <View>
-              <Text style={styles.stepEyebrow}>Lot {selectedLot.lotNo}</Text>
+              <Text style={styles.stepEyebrow}>ACTIVE LOT</Text>
               <Text style={styles.stepTitle}>Assign the next step</Text>
             </View>
             <View style={styles.lockedQuantity}>
               <Lock size={13} color={colors.muted} strokeWidth={2.4} />
-              <Text style={styles.lockedQuantityText}>{selectedLot.quantity} pcs</Text>
+              <Text style={styles.lockedQuantityText}>{activeLot.quantity} pcs</Text>
             </View>
           </View>
 
@@ -399,26 +353,28 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
               setOperationId(value);
               setLotError(null);
             }}
-            emptyText="No next operation is available."
-            icon={<ClipboardList size={17} color={colors.muted} strokeWidth={2} />}
+            emptyText="No next operation available."
+            icon={<ClipboardPenLine size={17} color={colors.muted} strokeWidth={2} />}
           />
 
           <PrimaryButton
             label={
               availableOperations.length > 0
-                ? `Assign ${availableOperations.find(
-                    (operation) => operation.id === operationId,
-                  )?.name || "next step"}`
+                ? `Assign ${selectedOperation?.name || "next step"}`
                 : "Lot completed"
             }
             onPress={handleCompleteStep}
             loading={submitting}
-            disabled={!employeeId || !operationId || availableOperations.length === 0}
+            disabled={
+              !employeeId ||
+              !operationId ||
+              availableOperations.length === 0
+            }
           />
         </View>
       ) : null}
 
-      {showNewLot ? (
+      {!lotLoading && !activeLot && shownLotNo ? (
         <View style={styles.newLotSection}>
           <View style={styles.divider} />
           <View style={styles.newLotHeader}>
@@ -497,18 +453,6 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
             returnKeyType="done"
           />
 
-          <TextField
-            label="Lot number"
-            required
-            placeholder="e.g. 7001"
-            value={lotNo}
-            onChangeText={setLotNo}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={40}
-            returnKeyType="done"
-          />
-
           <View style={styles.quantityBlock}>
             <FieldLabel label="Quantity" required />
             <QuantityStepper value={quantity} onChange={setQuantity} />
@@ -528,10 +472,10 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
         </View>
       ) : null}
 
-      {lots && lots.length === 0 && !showNewLot ? (
+      {!shownLotNo ? (
         <EmptyState
-          title="No active lot"
-          message="Start a new guided lot to record Cutting through Folding."
+          title="Enter a lot number"
+          message="Type 7001 or another lot number to see what is next."
         />
       ) : null}
     </View>
@@ -571,108 +515,25 @@ const styles = StyleSheet.create({
   },
   workflowSubtitle: {
     color: colors.muted,
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: "500",
     marginTop: 2,
-  },
-  newLotButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: colors.admin,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  newLotButtonSelected: {
-    backgroundColor: colors.primaryDark,
-  },
-  errorWrap: {
-    marginTop: -spacing.xs,
+    lineHeight: 14,
   },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   loadingText: {
     color: colors.muted,
     fontSize: 11,
     fontWeight: "500",
   },
-  lotPicker: {
-    gap: spacing.sm,
-  },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  lotScroll: {
-    gap: spacing.sm,
-    paddingBottom: 2,
-  },
-  lotCard: {
-    width: 148,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.canvas,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  lotCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryTint,
-  },
-  lotCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  lotNo: {
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-  },
-  lockBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    borderRadius: radii.pill,
-    backgroundColor: colors.lineSoft,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  lockText: {
-    color: colors.muted,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  lotStage: {
-    color: colors.body,
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontWeight: "700",
-  },
-  lotProgress: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-  },
-  progressDot: {
-    width: 17,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.line,
-  },
-  progressDotDone: {
-    backgroundColor: colors.success,
+  errorWrap: {
+    marginTop: -spacing.xs,
   },
   stepSection: {
     gap: spacing.md,

@@ -112,9 +112,11 @@ export const liveDataSource: DataSource = {
     return request<ManagerHomeData>("/manager/home");
   },
 
-  async managerLots(): Promise<ProductionLot[]> {
-    const result = await request<{ lots: ProductionLot[] }>("/manager/lots");
-    return result.lots;
+  async managerLot(lotNo): Promise<ProductionLot | null> {
+    const result = await request<{ lot: ProductionLot | null }>(
+      `/manager/lots/${encodeURIComponent(lotNo)}`
+    );
+    return result.lot;
   },
 
   async createProductionLot(input): Promise<ProductionLot> {

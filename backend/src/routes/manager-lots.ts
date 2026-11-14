@@ -97,6 +97,52 @@ async function loadLotsWithProgress(department: string) {
 }
 
 router.get(
+  "/lots/:lotNumber",
+  asyncHandler(async (req, res) => {
+    const scope = requestManagerScope(req, res);
+    if (!scope) return;
+
+    const lotNumber = cleanText(req.params.lotNumber);
+    if (!lotNumber || lotNumber.length > 40) {
+      return res.status(400).json({ error: "Enter a valid lot number." });
+    }
+
+    const lotResult = await pool.query<ProductionLotRow>(
+      `SELECT id, manager_id, department, lot_number,
+              meter::double precision AS meter,
+              area::double precision AS area,
+              width::double precision AS width,
+              panel::double precision AS panel,
+              remarks, quantity, status, created_at, updated_at, completed_at
+       FROM production_lots
+       WHERE department = 'PETTICOAT'
+         AND status = 'active'
+         AND lower(lot_number) = lower($1)
+       LIMIT 1`,
+      [lotNumber],
+    );
+
+    const lot = lotResult.rows[0];
+    if (!lot) return res.json({ lot: null });
+
+    const steps = await pool.query<{ operation_name: string }>(
+      `SELECT DISTINCT o.name AS operation_name
+       FROM work_entries w
+       JOIN operations o ON o.id = w.operation_id
+       WHERE w.production_lot_id = $1`,
+      [lot.id],
+    );
+
+    return res.json({
+      lot: toProductionLot(
+        lot,
+        steps.rows.map((step) => step.operation_name),
+      ),
+    });
+  }),
+);
+
+router.get(
   "/lots",
   asyncHandler(async (req, res) => {
     const scope = requestManagerScope(req, res);

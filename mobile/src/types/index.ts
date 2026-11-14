@@ -178,7 +178,7 @@ export type DataSource = {
   me(): Promise<SessionUser>;
 
   managerHome(): Promise<ManagerHomeData>;
-  managerLots(): Promise<ProductionLot[]>;
+  managerLot(lotNo: string): Promise<ProductionLot | null>;
   createProductionLot(
     input: CreateProductionLotInput,
   ): Promise<ProductionLot>;

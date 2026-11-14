@@ -629,16 +629,21 @@ export const demoDataSource: DataSource = {
     };
   },
 
-  async managerLots(): Promise<ProductionLot[]> {
+  async managerLot(lotNo): Promise<ProductionLot | null> {
     const db = await getDatabase();
     const manager = requireManager(db);
     const department = manager.department as Department;
 
-    if (department !== "PETTICOAT") return [];
+    if (department !== "PETTICOAT") return null;
 
-    return productionLots(db)
-      .filter((lot) => lot.department === department && lot.status === "active")
-      .map(toDemoProductionLot);
+    const lot = productionLots(db).find(
+      (candidate) =>
+        candidate.department === department &&
+        candidate.status === "active" &&
+        candidate.lotNo.toLowerCase() === lotNo.trim().toLowerCase()
+    );
+
+    return lot ? toDemoProductionLot(lot) : null;
   },
 
   async createProductionLot(input: CreateProductionLotInput) {
