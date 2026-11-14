@@ -1,7 +1,7 @@
 # Silai Saathi
 
 A simple employee and production management app for a small cloth-manufacturing
-factory. Silai Saathi gives Petticoat and RMG managers one familiar place to record
+factory. Silai Saathi gives Petticoat managers one familiar place to record
 daily stitching work, and gives the admin one place to manage people, operations,
 and production entries.
 
@@ -15,18 +15,15 @@ short forms, clear section colours, and no unnecessary settings.
 ### Manager flow
 
 1. Open the app and tap **Login**.
-2. Choose **Petticoat** or **RMG**.
-3. Sign in with the login ID and password created by the admin.
+2. Sign in with the login ID and password created by the admin.
 4. Petticoat managers use the guided lot workflow. Start a lot in **Cutting**
    with employee, meter, area, width, panel, remarks, lot number, and quantity.
    Continue the same lot through Interlock, Kamarpatti/Bottom/Dori/Nada in any
    order, Dhoka, and Folding. The quantity carries automatically.
-5. RMG managers use **Add work**: choose an employee, operation, lot number,
-   and quantity.
-6. Review today's entries, seven-day history, or all entries in **History**.
-7. View login details and log out from **Account**.
+5. Review today's entries, seven-day history, or all entries in **History**.
+6. View login details and log out from **Account**.
 
-Managers only see employees and operations from their own section. Each
+Managers only see Petticoat employees and operations. Each
 manager's history shows only the entries they submitted.
 
 ### Admin flow
@@ -35,9 +32,9 @@ The admin can:
 
 - See active manager, employee, and operation counts.
 - See today's entry and piece totals plus recent production.
-- Create manager logins with a name, login ID, password, and Petticoat/RMG
+- Create manager logins with a name, login ID, password, and Petticoat
   designation, then search by manager or employee name to edit details or reset a manager’s password.
-- Add employees to the Petticoat or RMG section.
+- Add employees and assign multiple Petticoat operations to each employee.
 - Create and disable operations.
 - Search managers and employees, and permanently delete records that have no
   production entries.
@@ -142,7 +139,6 @@ If Expo starts on a different port, use the URL printed in the terminal.
 | --- | --- | --- |
 | Admin | `admin` | `Admin@123` |
 | Petticoat manager | `petticoat` | `Petticoat@123` |
-| RMG manager | `rmg` | `Rmg@123` |
 
 The same credentials are shown on the login screens while the app is in preview
 mode. Preview passwords are stored locally in plain text for convenience. Do not

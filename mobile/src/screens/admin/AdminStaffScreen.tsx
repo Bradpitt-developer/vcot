@@ -465,7 +465,7 @@ export function AdminStaffScreen({ navigation }: Props) {
                 normalizedQuery
                   ? "Try a different name or login ID."
                   : segment === "managers"
-                    ? "Create a Petticoat or RMG manager login to get started."
+                    ? "Create a Petticoat manager login to get started."
                     : "Add employees so managers can select them."
               }
             />

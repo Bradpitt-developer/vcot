@@ -45,22 +45,28 @@ import type { Department, Operation, WorkEntry } from "../../types";
 import { errorMessage } from "../../utils/format";
 
 type Props = BottomTabScreenProps<AdminTabParamList, "Entries">;
-type Filter = "ALL" | Department;
+type Filter = Department;
 
-const filters: Array<{ key: Filter; label: string }> = [
-  { key: "ALL", label: "All" },
-  { key: "PETTICOAT", label: "Petticoat" },
-  { key: "RMG", label: "RMG" },
-];
+const sectionFilter = "PETTICOAT" as const;
+
+function formatDateInput(input: string) {
+  const digits = input.replace(/[^0-9]/g, "").slice(0, 8);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
 
 export function AdminEntriesScreen({}: Props) {
   const [entries, setEntries] = useState<WorkEntry[] | null>(null);
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const [filter] = useState<Filter>(sectionFilter);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportFilter, setReportFilter] = useState<Filter>("ALL");
+  const [reportFilter, setReportFilter] = useState<Filter>(sectionFilter);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportAction, setReportAction] = useState<ReportAction | null>(null);
   const [reportMode, setReportMode] = useState<"combined" | "custom">("combined");
@@ -116,25 +122,16 @@ export function AdminEntriesScreen({}: Props) {
     }, [loadEntries])
   );
 
-  const filteredEntries =
-    filter === "ALL"
-      ? entries || []
-      : (entries || []).filter((entry) => entry.department === filter);
+  const filteredEntries = entries || [];
 
-  const normalizedOperations = useMemo(() => {
-    if (reportFilter === "ALL") return operations;
-    return operations.filter((operation) => operation.department === reportFilter);
-  }, [operations, reportFilter]);
+  const normalizedOperations = operations;
 
   const operationOptions = [
     { value: "all", label: "All operations", hint: "Every operation" },
     ...normalizedOperations.map((operation) => ({
       value: operation.id,
-      label:
-        operation.department === "PETTICOAT"
-          ? `${operation.name} · Petticoat`
-          : `${operation.name} · RMG`,
-      hint: operation.department === "PETTICOAT" ? "Petticoat" : "RMG",
+      label: operation.name,
+      hint: "Petticoat",
     })),
   ];
 
@@ -155,7 +152,6 @@ export function AdminEntriesScreen({}: Props) {
         })();
 
   function openReportSheet() {
-    setReportFilter(filter);
     setReportMode("combined");
     setReportStatus("completed");
     setSelectedOperationId("all");
@@ -249,33 +245,6 @@ export function AdminEntriesScreen({}: Props) {
       />
 
       <View style={styles.toolbar}>
-        <View style={styles.filterRow}>
-          {filters.map((item) => {
-            const selected = filter === item.key;
-            return (
-              <Pressable
-                key={item.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => setFilter(item.key)}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  selected && styles.filterChipSelected,
-                  { opacity: pressed ? 0.75 : 1 },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selected && styles.filterTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryText}>
             {filteredEntries.length} entr
@@ -318,11 +287,7 @@ export function AdminEntriesScreen({}: Props) {
           ListEmptyComponent={
             <EmptyState
               title="No entries here"
-              message={
-                filter === "ALL"
-                  ? "Manager work entries will show up here."
-                  : `No ${filter === "PETTICOAT" ? "Petticoat" : "RMG"} entries have been submitted yet.`
-              }
+              message="Manager work entries will show up here."
             />
           }
           ListFooterComponent={
@@ -394,36 +359,6 @@ export function AdminEntriesScreen({}: Props) {
               </Pressable>
             </View>
 
-            <Text style={styles.reportSectionLabel}>Section</Text>
-            <View style={styles.reportFilterRow}>
-              {filters.map((item) => {
-                const selected = reportFilter === item.key;
-                return (
-                  <Pressable
-                    key={item.key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    onPress={() => setReportFilter(item.key)}
-                    disabled={Boolean(reportAction)}
-                    style={({ pressed }) => [
-                      styles.reportFilterChip,
-                      selected && styles.reportFilterChipSelected,
-                      { opacity: pressed ? 0.75 : 1 },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.reportFilterText,
-                        selected && styles.reportFilterTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             <Text style={styles.reportSectionLabel}>Report period</Text>
             <View style={styles.modeRow}>
               <Pressable
@@ -479,27 +414,33 @@ export function AdminEntriesScreen({}: Props) {
             ) : (
               <View style={styles.customDates}>
                 <TextField
-                  label="From"
+                  label="From date"
                   required
                   placeholder="14/11/2026"
                   value={customFrom}
-                  onChangeText={setCustomFrom}
+                  onChangeText={(value) => setCustomFrom(formatDateInput(value))}
                   keyboardType="number-pad"
                   maxLength={10}
-                  returnKeyType="done"
+                  returnKeyType="next"
+                  containerStyle={styles.dateField}
+                  style={styles.dateInput}
+                  textAlign="center"
                 />
                 <TextField
-                  label="To"
+                  label="To date"
                   required
                   placeholder="18/11/2026"
                   value={customTo}
-                  onChangeText={setCustomTo}
+                  onChangeText={(value) => setCustomTo(formatDateInput(value))}
                   keyboardType="number-pad"
                   maxLength={10}
                   returnKeyType="done"
+                  containerStyle={styles.dateField}
+                  style={styles.dateInput}
+                  textAlign="center"
                 />
                 <Text style={styles.dateFormatHint}>
-                  Use DD/MM/YYYY · maximum 31 days
+                  Type numbers only · slashes are added automatically · maximum 31 days
                 </Text>
               </View>
             )}
@@ -857,14 +798,14 @@ const styles = StyleSheet.create({
   },
   modeChip: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 56,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   modeChipSelected: {
     backgroundColor: colors.admin,
@@ -872,9 +813,9 @@ const styles = StyleSheet.create({
   },
   modeChipText: {
     color: colors.muted,
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontWeight: "700",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
     textAlign: "center",
   },
   modeChipTextSelected: {
@@ -885,36 +826,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.primaryTint,
-    padding: spacing.md,
-    gap: 3,
+    padding: spacing.lg,
+    gap: 5,
   },
   combinedTitle: {
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
   },
   combinedRange: {
     color: colors.ink,
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
   },
   combinedHint: {
     color: colors.muted,
-    fontSize: 9.5,
-    lineHeight: 14,
+    fontSize: 10.5,
+    lineHeight: 16,
     fontWeight: "500",
   },
   customDates: {
     flexDirection: "row",
     gap: spacing.sm,
-    flexWrap: "wrap",
+  },
+  dateField: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dateInput: {
+    minHeight: 68,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    paddingVertical: 0,
   },
   dateFormatHint: {
-    width: "100%",
     color: colors.faint,
-    fontSize: 9.5,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 16,
     fontWeight: "500",
+    marginTop: 2,
   },
   statusRow: {
     flexDirection: "row",

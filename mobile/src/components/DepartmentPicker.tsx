@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Scissors, Shirt } from "lucide-react-native";
+import { Scissors } from "lucide-react-native";
 
 import { colors, departmentColors, radii, spacing } from "../constants/theme";
 import type { Department } from "../types";
@@ -17,12 +17,6 @@ const options: Array<{
     title: "Petticoat",
     hint: "Petticoat team",
     icon: Scissors,
-  },
-  {
-    value: "RMG",
-    title: "RMG",
-    hint: "RMG team",
-    icon: Shirt,
   },
 ];
 

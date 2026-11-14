@@ -39,8 +39,6 @@ export async function validateOperationIds(
   const normalized = normalizeOperationIds(input);
   if (!normalized.ok) return normalized;
 
-  if (department === "RMG") return { ok: true, value: [] };
-
   if (normalized.value.length === 0) {
     return {
       ok: false,

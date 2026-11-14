@@ -22,15 +22,6 @@ const DEFAULT_OPERATIONS: Record<Department, readonly string[]> = {
     "Dori",
     "Nada",
   ],
-  RMG: [
-    "Kamarpatti",
-    "Interlock",
-    "Bottom",
-    "Dhoka",
-    "Folding",
-    "Dori",
-    "Nada",
-  ],
 };
 
 const RETIRED_STARTER_OPERATIONS: readonly string[] = [

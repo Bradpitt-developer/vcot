@@ -105,7 +105,7 @@ export function AddManagerScreen({ navigation }: Props) {
               <Text style={styles.introTitle}>A login for your manager</Text>
               <Text style={styles.introText}>
                 After saving, share the login ID and password with the manager.
-                They can then sign in from the Petticoat or RMG option.
+                They can then sign in from the Petticoat option.
               </Text>
             </View>
           </View>
@@ -185,8 +185,7 @@ export function AddManagerScreen({ navigation }: Props) {
             <View style={styles.infoRow}>
               <Info size={15} color={colors.info} strokeWidth={2} />
               <Text style={styles.infoText}>
-                This manager will see employees and operations from the{" "}
-                {department === "PETTICOAT" ? "Petticoat" : "RMG"} section.
+                This manager will see employees and operations from the Petticoat section.
               </Text>
             </View>
 

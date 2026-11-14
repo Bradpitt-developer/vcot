@@ -55,7 +55,7 @@ router.post(
     const password = normalizePassword(req.body?.password);
 
     if (!isDepartment(department)) {
-      return res.status(400).json({ error: "Please choose Petticoat or RMG." });
+      return res.status(400).json({ error: "Please choose Petticoat." });
     }
     if (!username || !password) {
       return res

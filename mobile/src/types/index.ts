@@ -1,4 +1,4 @@
-export type Department = "PETTICOAT" | "RMG";
+export type Department = "PETTICOAT";
 export type UserRole = "admin" | "manager";
 
 export type SessionUser = {

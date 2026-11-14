@@ -49,15 +49,6 @@ const STARTER_OPERATIONS: Record<Department, string[]> = {
     "Dori",
     "Nada",
   ],
-  RMG: [
-    "Kamarpatti",
-    "Interlock",
-    "Bottom",
-    "Dhoka",
-    "Folding",
-    "Dori",
-    "Nada",
-  ],
 };
 
 const RETIRED_STARTER_OPERATION_IDS = new Set([
@@ -134,18 +125,6 @@ function seedDatabase(): DemoDatabase {
     lastLoginAt: null,
   };
 
-  const rmgManager: DemoUser = {
-    id: "mgr_rmg_demo",
-    name: "Sunita Devi",
-    username: "rmg",
-    password: "Rmg@123",
-    role: "manager",
-    department: "RMG",
-    isActive: true,
-    createdAt: daysAgo(40),
-    lastLoginAt: null,
-  };
-
   const admin: DemoUser = {
     id: "admin_demo",
     name: "Factory Admin",
@@ -181,30 +160,6 @@ function seedDatabase(): DemoDatabase {
       department: "PETTICOAT",
       isActive: true,
       createdAt: daysAgo(28),
-      operations: [],
-    },
-    {
-      id: "emp_pooja",
-      name: "Pooja Sharma",
-      department: "RMG",
-      isActive: true,
-      createdAt: daysAgo(26),
-      operations: [],
-    },
-    {
-      id: "emp_vikas",
-      name: "Vikas Gupta",
-      department: "RMG",
-      isActive: true,
-      createdAt: daysAgo(22),
-      operations: [],
-    },
-    {
-      id: "emp_neha",
-      name: "Neha Verma",
-      department: "RMG",
-      isActive: true,
-      createdAt: daysAgo(18),
       operations: [],
     },
   ];
@@ -260,19 +215,6 @@ function seedDatabase(): DemoDatabase {
       createdAt: minutesAgo(55),
     },
     {
-      id: "entry_seed_2",
-      employeeId: "emp_pooja",
-      employeeName: "Pooja Sharma",
-      managerId: rmgManager.id,
-      managerName: rmgManager.name,
-      operationId: "op_rmg_interlock",
-      operationName: "Interlock",
-      lotNo: "R-208",
-      quantity: 200,
-      department: "RMG",
-      createdAt: minutesAgo(120),
-    },
-    {
       id: "entry_seed_3",
       employeeId: "emp_meena",
       employeeName: "Meena Kumari",
@@ -284,19 +226,6 @@ function seedDatabase(): DemoDatabase {
       quantity: 85,
       department: "PETTICOAT",
       createdAt: minutesAgo(310),
-    },
-    {
-      id: "entry_seed_4",
-      employeeId: "emp_vikas",
-      employeeName: "Vikas Gupta",
-      managerId: rmgManager.id,
-      managerName: rmgManager.name,
-      operationId: "op_rmg_folding",
-      operationName: "Folding",
-      lotNo: "R-207",
-      quantity: 144,
-      department: "RMG",
-      createdAt: daysAgo(1),
     },
     {
       id: "entry_seed_5",
@@ -315,7 +244,7 @@ function seedDatabase(): DemoDatabase {
 
   return {
     version: 2,
-    users: [admin, petticoatManager, rmgManager],
+    users: [admin, petticoatManager],
     employees,
     operations,
     entries,
@@ -567,8 +496,8 @@ function validatePassword(value: unknown): string {
 }
 
 function validateDepartment(value: unknown): Department {
-  if (value !== "PETTICOAT" && value !== "RMG") {
-    throw new DemoError("Department must be Petticoat or RMG.");
+  if (value !== "PETTICOAT") {
+    throw new DemoError("Department must be Petticoat.");
   }
   return value;
 }
@@ -1061,9 +990,6 @@ export const demoDataSource: DataSource = {
     requireAdmin(db);
     return [...db.employees].sort((a, b) => {
       if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-      if (a.department !== b.department) {
-        return a.department.localeCompare(b.department);
-      }
       return a.name.localeCompare(b.name);
     });
   },
@@ -1158,9 +1084,6 @@ export const demoDataSource: DataSource = {
     requireAdmin(db);
     return [...db.operations].sort((a, b) => {
       if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-      if (a.department !== b.department) {
-        return a.department.localeCompare(b.department);
-      }
       return a.name.localeCompare(b.name);
     });
   },

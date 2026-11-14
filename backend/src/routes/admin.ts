@@ -94,7 +94,7 @@ function validatePassword(value: unknown): ValidationResult<string> {
 function validateDepartment(value: unknown): ValidationResult<Department> {
   const department = normalizeDepartment(value);
   if (!isDepartment(department)) {
-    return { ok: false, error: "Department must be Petticoat or RMG." };
+    return { ok: false, error: "Department must be Petticoat." };
   }
   return { ok: true, value: department };
 }
@@ -619,27 +619,11 @@ router.patch(
       > = { ok: true, value: [] };
 
       if (shouldValidateOperations) {
-        if (
-          requestedOperations === undefined &&
-          desiredDepartment === "RMG"
-        ) {
-          operationIdsResult = { ok: true, value: [] };
-        } else if (
-          requestedOperations === undefined &&
-          desiredDepartment === "PETTICOAT" &&
-          existing.department === "RMG"
-        ) {
-          await client.query("ROLLBACK");
-          return res.status(400).json({
-            error: "Select at least one operation for this Petticoat employee.",
-          });
-        } else {
-          operationIdsResult = await validateOperationIds(
-            client,
-            requestedOperations,
-            desiredDepartment,
-          );
-        }
+        operationIdsResult = await validateOperationIds(
+          client,
+          requestedOperations,
+          desiredDepartment,
+        );
       }
 
       if (!operationIdsResult.ok) {

@@ -90,7 +90,5 @@ export function calculateRangeInclusiveDays(from: string, to: string): number {
 }
 
 export function reportDepartmentLabel(department: ReportDepartment): string {
-  if (department === "PETTICOAT") return "Petticoat";
-  if (department === "RMG") return "RMG";
-  return "All sections";
+  return "Petticoat";
 }

@@ -2,7 +2,7 @@
   "name": "silai-saathi",
   "version": "1.0.0",
   "private": true,
-  "description": "Employee and production management app for Petticoat and RMG teams",
+  "description": "Employee and production management app for Petticoat teams",
   "scripts": {
     "start": "npm --prefix mobile run start",
     "web": "npm --prefix mobile run web",

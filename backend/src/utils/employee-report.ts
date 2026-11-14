@@ -73,10 +73,7 @@ const BAND_FILL = "F7FAF8";
 const PENDING_FILL = "FFF5E1";
 const COMPLETE_FILL = "EAF8EF";
 
-const departmentLabel = (department: Department | "ALL") => {
-  if (department === "ALL") return "All sections";
-  return department === "PETTICOAT" ? "Petticoat" : "RMG";
-};
+const departmentLabel = (_department: Department | "ALL") => "Petticoat";
 
 const statusLabel = (status: ReportStatus) =>
   status === "completed" ? "Completed" : "Uncompleted";
@@ -296,10 +293,7 @@ function setupCompletedSheet(
   title: string,
   subtitle: string,
 ) {
-  const sheetName = safeSheetName(
-    operation.name,
-    operation.department === "PETTICOAT" ? "" : " (RMG)",
-  );
+  const sheetName = safeSheetName(operation.name);
   const worksheet = workbook.addWorksheet(sheetName, {
     views: [{ state: "frozen", ySplit: 2 }],
     pageSetup: { orientation: "landscape", fitToWidth: 1, fitToHeight: 0 },

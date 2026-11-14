@@ -18,11 +18,7 @@ export function Avatar({
 }) {
   const palette = admin
     ? { bg: colors.admin, fg: colors.white }
-    : department === "PETTICOAT"
-      ? { bg: colors.petticoatSoft, fg: colors.petticoat }
-      : department === "RMG"
-        ? { bg: colors.rmgSoft, fg: colors.rmg }
-        : { bg: colors.primarySoft, fg: colors.primaryDark };
+    : { bg: colors.petticoatSoft, fg: colors.petticoat };
 
   return (
     <View

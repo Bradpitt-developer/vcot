@@ -49,7 +49,7 @@ const quickActions: Array<{
 }> = [
   {
     label: "Add manager",
-    hint: "Create a Petticoat or RMG manager login",
+    hint: "Create a Petticoat manager login",
     icon: UserRound,
     target: "AddManager",
   },
