@@ -21,6 +21,7 @@ import {
   replaceEmployeeOperations,
   validateOperationIds,
 } from "../utils/employee-operations";
+import { buildEmployeeReport } from "../utils/employee-report";
 import {
   toEmployee,
   toEntry,
@@ -953,6 +954,87 @@ router.get(
     );
 
     return res.json({ entries: rows.map(toEntry) });
+  }),
+);
+
+router.get(
+  "/reports/production",
+  asyncHandler(async (req, res) => {
+    const from = req.query.from;
+    const to = req.query.to;
+    const status = String(req.query.status || "").trim().toLowerCase();
+    const departmentQuery = req.query.department;
+    const operationId = String(req.query.operationId || "all").trim();
+
+    if (!isDateKey(from) || !isDateKey(to)) {
+      return res.status(400).json({
+        error: "Choose the report start and end dates in YYYY-MM-DD format.",
+      });
+    }
+    if (from > to) {
+      return res.status(400).json({
+        error: "The start date cannot be after the end date.",
+      });
+    }
+
+    const today = todayInKolkata();
+    if (to > today) {
+      return res.status(400).json({
+        error: "Reports cannot be generated for future dates.",
+      });
+    }
+
+    const inclusiveDays = (dateKeyToUtc(to) - dateKeyToUtc(from)) / 86_400_000 + 1;
+    if (inclusiveDays > 31) {
+      return res.status(400).json({
+        error: "The selected report period cannot exceed 31 calendar days.",
+      });
+    }
+
+    if (status !== "completed" && status !== "uncompleted") {
+      return res.status(400).json({
+        error: "Choose Completed or Uncompleted.",
+      });
+    }
+
+    const department =
+      typeof departmentQuery === "string" && departmentQuery.trim()
+        ? normalizeDepartment(departmentQuery)
+        : null;
+
+    if (
+      department === null &&
+      typeof departmentQuery === "string" &&
+      departmentQuery.trim()
+    ) {
+      return res.status(400).json({ error: "Invalid department filter." });
+    }
+    if (department && !isDepartment(department)) {
+      return res.status(400).json({ error: "Invalid department filter." });
+    }
+
+    if (
+      operationId !== "all" &&
+      !isUuid(operationId)
+    ) {
+      return res.status(400).json({ error: "Invalid operation selection." });
+    }
+
+    const report = await buildEmployeeReport(pool, {
+      from,
+      to,
+      department: (department ?? "ALL") as Department | "ALL",
+      operationId,
+      status,
+    });
+
+    return res.json({
+      file: {
+        filename: report.filename,
+        contentType: report.contentType,
+        base64: report.base64,
+      },
+    });
   }),
 );
 

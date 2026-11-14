@@ -10,6 +10,8 @@ import type {
   DataSource,
   Department,
   Employee,
+  EmployeeReportFile,
+  EmployeeReportQuery,
   LoginResult,
   Manager,
   ManagerHomeData,
@@ -267,6 +269,25 @@ export const liveDataSource: DataSource = {
       `/admin/entries/report?${query.toString()}`
     );
     return result.entries;
+  },
+
+  async adminEmployeeReport(input: EmployeeReportQuery): Promise<EmployeeReportFile> {
+    const query = new URLSearchParams({
+      from: input.from,
+      to: input.to,
+      department: input.department === "ALL" ? "" : input.department,
+      operationId: input.operationId,
+      status: input.status,
+    });
+
+    if (!query.get("department")) {
+      query.delete("department");
+    }
+
+    const result = await request<{ file: EmployeeReportFile }>(
+      `/admin/reports/production?${query.toString()}`
+    );
+    return result.file;
   },
 
   async entries(department?: Department, limit = 100): Promise<WorkEntry[]> {

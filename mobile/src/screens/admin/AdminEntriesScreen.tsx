@@ -1,11 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,16 +22,26 @@ import {
   X,
 } from "lucide-react-native";
 import { EmptyState } from "../../components/EmptyState";
-import { ErrorBanner } from "../../components/Form";
+import { ErrorBanner, TextField } from "../../components/Form";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { SelectField } from "../../components/SelectSheet";
 import { WorkEntryRow } from "../../components/WorkEntryRow";
 import { colors, radii, shadow, spacing } from "../../constants/theme";
 import { useToast } from "../../context/ToastContext";
-import { deliverReport, type ReportAction } from "../../services/reportDelivery";
+import {
+  deliverReport,
+  type ReportAction,
+} from "../../services/reportDelivery";
 import type { AdminTabParamList } from "../../navigation/types";
 import { data } from "../../services/data";
-import { getReportDays } from "../../utils/report";
-import type { Department, WorkEntry } from "../../types";
+import {
+  calculateRangeInclusiveDays,
+  formatDisplayDate,
+  getCombinedReportRange,
+  parseDisplayDate,
+  reportDepartmentLabel,
+} from "../../utils/report";
+import type { Department, Operation, WorkEntry } from "../../types";
 import { errorMessage } from "../../utils/format";
 
 type Props = BottomTabScreenProps<AdminTabParamList, "Entries">;
@@ -54,12 +63,35 @@ export function AdminEntriesScreen({}: Props) {
   const [reportFilter, setReportFilter] = useState<Filter>("ALL");
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportAction, setReportAction] = useState<ReportAction | null>(null);
+  const [reportMode, setReportMode] = useState<"combined" | "custom">("combined");
+  const [reportStatus, setReportStatus] = useState<"completed" | "uncompleted">(
+    "completed",
+  );
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [selectedOperationId, setSelectedOperationId] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const loadedOnce = useRef(false);
   const { showToast } = useToast();
-  const reportDays = useMemo(() => getReportDays(31), []);
-  const [selectedReportDate, setSelectedReportDate] = useState(
-    () => reportDays[0]?.date ?? "",
-  );
+
+  useEffect(() => {
+    if (!reportOpen) return;
+
+    let mounted = true;
+    data.operations()
+      .then((result) => {
+        if (mounted) {
+          setOperations(result.filter((operation) => operation.isActive));
+        }
+      })
+      .catch(() => {
+        if (mounted) setOperations([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [reportOpen]);
 
   const loadEntries = useCallback(async (options?: { refresh?: boolean }) => {
     if (options?.refresh) setRefreshing(true);
@@ -89,18 +121,70 @@ export function AdminEntriesScreen({}: Props) {
       ? entries || []
       : (entries || []).filter((entry) => entry.department === filter);
 
-  const selectedDay =
-    reportDays.find((day) => day.date === selectedReportDate) ?? reportDays[0];
+  const normalizedOperations = useMemo(() => {
+    if (reportFilter === "ALL") return operations;
+    return operations.filter((operation) => operation.department === reportFilter);
+  }, [operations, reportFilter]);
+
+  const operationOptions = [
+    { value: "all", label: "All operations", hint: "Every operation" },
+    ...normalizedOperations.map((operation) => ({
+      value: operation.id,
+      label:
+        operation.department === "PETTICOAT"
+          ? `${operation.name} · Petticoat`
+          : `${operation.name} · RMG`,
+      hint: operation.department === "PETTICOAT" ? "Petticoat" : "RMG",
+    })),
+  ];
+
+  const reportRange =
+    reportMode === "combined"
+      ? getCombinedReportRange()
+      : (() => {
+          const from = parseDisplayDate(customFrom);
+          const to = parseDisplayDate(customTo);
+          if (!from || !to) {
+            return { from: "", to: "", dateLabel: "Choose the dates" };
+          }
+          return {
+            from,
+            to,
+            dateLabel: `${formatDisplayDate(from)} – ${formatDisplayDate(to)}`,
+          };
+        })();
 
   function openReportSheet() {
     setReportFilter(filter);
+    setReportMode("combined");
+    setReportStatus("completed");
+    setSelectedOperationId("all");
     setReportError(null);
     setReportOpen(true);
   }
 
+  function validateReportRange(): string | null {
+    if (reportMode === "combined") return null;
+
+    const from = parseDisplayDate(customFrom);
+    const to = parseDisplayDate(customTo);
+    if (!from || !to) {
+      return "Enter valid dates in DD/MM/YYYY format.";
+    }
+    if (from > to) {
+      return "The start date cannot be after the end date.";
+    }
+    const days = calculateRangeInclusiveDays(from, to);
+    if (days > 31) {
+      return "The selected report period cannot exceed 31 calendar days.";
+    }
+    return null;
+  }
+
   async function runReport(action: ReportAction) {
-    if (!selectedDay) {
-      setReportError("Choose a day from the last 31 days first.");
+    const validationError = validateReportRange();
+    if (validationError) {
+      setReportError(validationError);
       return;
     }
 
@@ -108,17 +192,35 @@ export function AdminEntriesScreen({}: Props) {
     setReportError(null);
 
     try {
-      const department =
-        reportFilter === "ALL" ? undefined : reportFilter;
-      const reportEntries = await data.adminReportEntries({
-        date: selectedDay.date,
+      const department = reportFilter;
+      const file = await data.adminEmployeeReport({
+        from: reportRange.from,
+        to: reportRange.to,
         department,
+        operationId: selectedOperationId,
+        status: reportStatus,
       });
 
+      const selectedOperation = normalizedOperations.find(
+        (operation) => operation.id === selectedOperationId,
+      );
+      const operationLabel = selectedOperation
+        ? selectedOperation.name
+        : "All operations";
+      const departmentName = reportDepartmentLabel(reportFilter);
+      const statusLabel =
+        reportStatus === "completed" ? "Completed" : "Uncompleted";
+
       const message = await deliverReport(action, {
-        day: selectedDay,
-        department: reportFilter,
-        entries: reportEntries,
+        file,
+        subjectText: `Silai Saathi ${statusLabel} report | ${reportRange.dateLabel}`,
+        bodyText: [
+          "Silai Saathi production report",
+          `Section: ${departmentName}`,
+          `Operation: ${operationLabel}`,
+          `Status: ${statusLabel}`,
+          `Period: ${reportRange.dateLabel}`,
+        ].join("\n"),
       });
 
       showToast(
@@ -276,7 +378,7 @@ export function AdminEntriesScreen({}: Props) {
               <View style={styles.reportHeaderText}>
                 <Text style={styles.reportTitle}>Generate report</Text>
                 <Text style={styles.reportSubtitle}>
-                  Choose one of the last 31 days
+                  Choose 31 days, a date range, status and operation
                 </Text>
               </View>
               <Pressable
@@ -322,42 +424,148 @@ export function AdminEntriesScreen({}: Props) {
               })}
             </View>
 
-            <Text style={styles.reportSectionLabel}>Day (last 31 days)</Text>
-            <ScrollView
-              style={styles.dayList}
-              contentContainerStyle={styles.dayListContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {reportDays.map((day) => {
-                const selected = day.date === selectedDay?.date;
-                return (
-                  <Pressable
-                    key={day.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    onPress={() => setSelectedReportDate(day.date)}
-                    disabled={Boolean(reportAction)}
-                    style={({ pressed }) => [
-                      styles.dayRow,
-                      selected && styles.dayRowSelected,
-                      { opacity: pressed ? 0.75 : 1 },
-                    ]}
-                  >
-                    <View style={styles.dayRowText}>
-                      <Text style={styles.dayTitle}>{day.title}</Text>
-                      <Text style={styles.dayDate}>{day.dateLabel}</Text>
-                    </View>
-                    {selected ? (
-                      <CheckCircle2
-                        size={20}
-                        color={colors.success}
-                        strokeWidth={2.1}
-                      />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <Text style={styles.reportSectionLabel}>Report period</Text>
+            <View style={styles.modeRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: reportMode === "combined" }}
+                onPress={() => setReportMode("combined")}
+                disabled={Boolean(reportAction)}
+                style={({ pressed }) => [
+                  styles.modeChip,
+                  reportMode === "combined" && styles.modeChipSelected,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeChipText,
+                    reportMode === "combined" && styles.modeChipTextSelected,
+                  ]}
+                >
+                  31-day combined report
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: reportMode === "custom" }}
+                onPress={() => setReportMode("custom")}
+                disabled={Boolean(reportAction)}
+                style={({ pressed }) => [
+                  styles.modeChip,
+                  reportMode === "custom" && styles.modeChipSelected,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeChipText,
+                    reportMode === "custom" && styles.modeChipTextSelected,
+                  ]}
+                >
+                  Choose date range
+                </Text>
+              </Pressable>
+            </View>
+
+            {reportMode === "combined" ? (
+              <View style={styles.combinedCard}>
+                <Text style={styles.combinedTitle}>Last 31 calendar days</Text>
+                <Text style={styles.combinedRange}>{reportRange.dateLabel}</Text>
+                <Text style={styles.combinedHint}>
+                  The report file contains all selected operations in this period.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.customDates}>
+                <TextField
+                  label="From"
+                  required
+                  placeholder="14/11/2026"
+                  value={customFrom}
+                  onChangeText={setCustomFrom}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  returnKeyType="done"
+                />
+                <TextField
+                  label="To"
+                  required
+                  placeholder="18/11/2026"
+                  value={customTo}
+                  onChangeText={setCustomTo}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  returnKeyType="done"
+                />
+                <Text style={styles.dateFormatHint}>
+                  Use DD/MM/YYYY · maximum 31 days
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.reportSectionLabel}>Status</Text>
+            <View style={styles.statusRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: reportStatus === "completed" }}
+                onPress={() => setReportStatus("completed")}
+                disabled={Boolean(reportAction)}
+                style={({ pressed }) => [
+                  styles.statusChip,
+                  reportStatus === "completed" && styles.statusChipSelected,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <CheckCircle2
+                  size={16}
+                  color={reportStatus === "completed" ? colors.white : colors.success}
+                  strokeWidth={2.2}
+                />
+                <Text
+                  style={[
+                    styles.statusChipText,
+                    reportStatus === "completed" && styles.statusChipTextSelected,
+                  ]}
+                >
+                  Completed
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: reportStatus === "uncompleted" }}
+                onPress={() => setReportStatus("uncompleted")}
+                disabled={Boolean(reportAction)}
+                style={({ pressed }) => [
+                  styles.statusChip,
+                  reportStatus === "uncompleted" && styles.statusChipUncompleted,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusChipText,
+                    reportStatus === "uncompleted" && styles.statusChipTextSelected,
+                  ]}
+                >
+                  Uncompleted
+                </Text>
+              </Pressable>
+            </View>
+
+            <SelectField
+              label="Operation"
+              placeholder="Choose operation"
+              value={selectedOperationId}
+              options={operationOptions}
+              onChange={setSelectedOperationId}
+              icon={<FileSpreadsheet size={17} color={colors.muted} strokeWidth={2} />}
+            />
+
+            <Text style={styles.reportRangeSummary}>
+              {reportRange.dateLabel}
+              {reportRange.from ? ` · ${calculateRangeInclusiveDays(reportRange.from, reportRange.to)} days` : ""}
+            </Text>
 
             {reportError ? (
               <View style={styles.reportErrorWrap}>
@@ -368,7 +576,7 @@ export function AdminEntriesScreen({}: Props) {
             <View style={styles.reportActions}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Send CSV report on WhatsApp"
+                accessibilityLabel="Send Excel report on WhatsApp"
                 disabled={Boolean(reportAction)}
                 onPress={() => void runReport("whatsapp")}
                 style={({ pressed }) => [
@@ -389,14 +597,14 @@ export function AdminEntriesScreen({}: Props) {
                 <View style={styles.reportActionText}>
                   <Text style={styles.reportActionTitle}>WhatsApp</Text>
                   <Text style={styles.reportActionSub}>
-                    CSV report with recipient selection
+                    Excel report with recipient selection
                   </Text>
                 </View>
               </Pressable>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Send CSV report by email"
+                accessibilityLabel="Send Excel report by email"
                 disabled={Boolean(reportAction)}
                 onPress={() => void runReport("email")}
                 style={({ pressed }) => [
@@ -417,14 +625,14 @@ export function AdminEntriesScreen({}: Props) {
                 <View style={styles.reportActionText}>
                   <Text style={styles.reportActionTitle}>Email</Text>
                   <Text style={styles.reportActionSub}>
-                    CSV attached to your email draft
+                    Excel report attached to your email draft
                   </Text>
                 </View>
               </Pressable>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Download CSV report"
+                accessibilityLabel="Download Excel report"
                 disabled={Boolean(reportAction)}
                 onPress={() => void runReport("download")}
                 style={({ pressed }) => [
@@ -445,16 +653,16 @@ export function AdminEntriesScreen({}: Props) {
                 <View style={styles.reportActionText}>
                   <Text style={styles.reportActionTitle}>Download</Text>
                   <Text style={styles.reportActionSub}>
-                    Excel-compatible CSV file
+                    Excel workbook with operation sheets
                   </Text>
                 </View>
               </Pressable>
             </View>
 
             <Text style={styles.reportNote}>
-              Showing only the last 31 calendar days. Reports roll forward
-              automatically every day. WhatsApp and email open the device
-              sharing or email flow with the CSV attached.
+              Showing only the last 31 calendar days. The report is an Excel
+              workbook with operation sheets. WhatsApp and email open the
+              device sharing flow with the report attached.
             </Text>
           </View>
         </View>
@@ -643,41 +851,110 @@ const styles = StyleSheet.create({
   reportFilterTextSelected: {
     color: colors.white,
   },
-  dayList: {
-    maxHeight: 220,
-  },
-  dayListContent: {
+  modeRow: {
+    flexDirection: "row",
     gap: spacing.sm,
   },
-  dayRow: {
-    minHeight: 54,
+  modeChip: {
+    flex: 1,
+    minHeight: 42,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
   },
-  dayRowSelected: {
-    borderColor: colors.success,
-    backgroundColor: colors.successSoft,
+  modeChipSelected: {
+    backgroundColor: colors.admin,
+    borderColor: colors.admin,
   },
-  dayRowText: {
-    flex: 1,
+  modeChipText: {
+    color: colors.muted,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: "700",
+    textAlign: "center",
   },
-  dayTitle: {
-    color: colors.ink,
-    fontSize: 11.5,
+  modeChipTextSelected: {
+    color: colors.white,
+  },
+  combinedCard: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.primaryTint,
+    padding: spacing.md,
+    gap: 3,
+  },
+  combinedTitle: {
+    color: colors.primaryDark,
+    fontSize: 12,
     fontWeight: "800",
   },
-  dayDate: {
+  combinedRange: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  combinedHint: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: 9.5,
+    lineHeight: 14,
     fontWeight: "500",
-    marginTop: 2,
+  },
+  customDates: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  dateFormatHint: {
+    width: "100%",
+    color: colors.faint,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  statusChip: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: "#B7E6CF",
+    backgroundColor: colors.successSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: spacing.sm,
+  },
+  statusChipSelected: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  statusChipUncompleted: {
+    backgroundColor: colors.warning,
+    borderColor: colors.warning,
+  },
+  statusChipText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  statusChipTextSelected: {
+    color: colors.white,
+  },
+  reportRangeSummary: {
+    color: colors.muted,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   reportErrorWrap: {
     marginTop: -spacing.xs,

@@ -3,39 +3,31 @@ import * as MailComposer from "expo-mail-composer";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
-import type { WorkEntry } from "../types";
-import {
-  reportDepartmentLabel,
-  reportFileName,
-  reportSummary,
-  workEntriesToCsv,
-  type ReportDepartment,
-  type ReportDay,
-} from "../utils/report";
-
 export type ReportAction = "whatsapp" | "email" | "download";
 
-export type ReportDelivery = {
-  day: ReportDay;
-  department: ReportDepartment;
-  entries: WorkEntry[];
+export type ReportFile = {
+  filename: string;
+  contentType: string;
+  base64: string;
 };
 
-function reportText(delivery: ReportDelivery) {
-  const label = reportDepartmentLabel(delivery.department);
-  const summary = reportSummary(delivery.entries);
+export type GeneratedReport = {
+  file: ReportFile;
+  subjectText: string;
+  bodyText: string;
+};
 
-  return [
-    "Silai Saathi production report",
-    `Date: ${delivery.day.dateLabel}`,
-    `Section: ${label}`,
-    `Entries: ${summary.entries}`,
-    `Pieces: ${summary.pieces}`,
-  ].join("\n");
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
 }
 
-function webDownload(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+function webDownload(filename: string, contentType: string, base64: string) {
+  const blob = new Blob([base64ToArrayBuffer(base64)], { type: contentType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
 
@@ -62,93 +54,98 @@ function canShareWebFile(file: File): boolean {
 
 async function deliverWebReport(
   action: ReportAction,
-  filename: string,
-  csv: string,
-  text: string,
+  report: GeneratedReport,
 ): Promise<string> {
-  const browserFile = new File([csv], filename, {
-    type: "text/csv;charset=utf-8",
-  });
+  const browserFile = new File(
+    [base64ToArrayBuffer(report.file.base64)],
+    report.file.filename,
+    { type: report.file.contentType },
+  );
 
   if (action !== "download" && canShareWebFile(browserFile)) {
     await navigator.share({
       files: [browserFile],
-      title: `Silai Saathi report ${filename}`,
-      text,
+      title: report.subjectText,
+      text: report.bodyText,
     });
-    return `Report shared with ${action === "whatsapp" ? "WhatsApp or your chosen app" : "email or your chosen app"}.`;
+    return "Report shared from your browser.";
   }
 
-  webDownload(filename, csv);
+  webDownload(report.file.filename, report.file.contentType, report.file.base64);
 
   if (action === "whatsapp") {
-    const message = `${text}\n\nThe CSV report has been downloaded. Attach it to this WhatsApp message.`;
+    const message = `${report.bodyText}\n\nThe report has been downloaded. Attach it to this WhatsApp message.`;
     window.open(
       `https://wa.me/?text=${encodeURIComponent(message)}`,
       "_blank",
       "noopener,noreferrer",
     );
-    return "CSV downloaded. Attach it in WhatsApp.";
+    return "Excel report downloaded. Attach it in WhatsApp.";
   }
 
   if (action === "email") {
-    const subject = `Silai Saathi report | ${text.split("\n")[1]?.replace(/^Date:\s*/, "") || "Production"}`;
-    const body = `${text}\n\nThe CSV report has been downloaded. Attach it to this email.`;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    return "CSV downloaded. Attach it in your email app.";
+    const body = `${report.bodyText}\n\nThe report has been downloaded. Attach it to this email.`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(report.subjectText)}&body=${encodeURIComponent(body)}`;
+    return "Excel report downloaded. Attach it in your email app.";
   }
 
-  return "CSV downloaded.";
+  return "Excel report downloaded.";
 }
 
-async function createCacheCsvFile(filename: string, csv: string): Promise<string> {
+async function createCacheFile(filename: string, base64: string): Promise<string> {
   if (!FileSystem.cacheDirectory) {
     throw new Error("The app could not create a temporary file for the report.");
   }
 
   const fileUri = `${FileSystem.cacheDirectory}${filename}`;
   await FileSystem.deleteAsync(fileUri, { idempotent: true });
-  await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+  await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: "base64" });
   return fileUri;
 }
 
-async function downloadAndroidCsv(filename: string, csv: string): Promise<string> {
+async function downloadAndroidFile(report: GeneratedReport): Promise<string> {
   const saf = FileSystem.StorageAccessFramework;
   const initialUri = saf.getUriForDirectoryInRoot("Download");
   const permission = await saf.requestDirectoryPermissionsAsync(initialUri);
 
   if (!permission.granted) {
-    throw new Error("Choose the Downloads folder to save the CSV report.");
+    throw new Error("Choose the Downloads folder to save the report.");
   }
 
-  const fileNameWithoutExtension = filename.replace(/\.csv$/i, "");
+  const baseName = report.file.filename.replace(/\.xlsx?$/i, "");
+  const contentType = report.file.contentType;
   const fileUri = await saf.createFileAsync(
     permission.directoryUri,
-    fileNameWithoutExtension,
-    "text/csv",
+    baseName,
+    contentType,
   );
-  await saf.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+  await saf.writeAsStringAsync(fileUri, report.file.base64, {
+    encoding: "base64",
+  });
 
-  return "CSV saved to the selected folder.";
+  return "Excel report saved to the selected folder.";
 }
 
 export async function deliverReport(
   action: ReportAction,
-  delivery: ReportDelivery,
+  report: GeneratedReport,
 ): Promise<string> {
-  const csv = workEntriesToCsv(delivery.entries);
-  const filename = reportFileName(delivery.day, delivery.department);
-  const text = reportText(delivery);
-
   if (Platform.OS === "web") {
-    return deliverWebReport(action, filename, csv, text);
+    return deliverWebReport(action, report);
   }
 
   if (action === "download" && Platform.OS === "android") {
-    return downloadAndroidCsv(filename, csv);
+    return downloadAndroidFile(report);
   }
 
-  const fileUri = await createCacheCsvFile(filename, csv);
+  const fileUri = await createCacheFile(
+    report.file.filename,
+    report.file.base64,
+  );
+  const mimeType =
+    report.file.contentType ||
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const uti = "org.openxmlformats.spreadsheetml.sheet";
 
   if (action === "whatsapp") {
     if (!(await Sharing.isAvailableAsync())) {
@@ -156,24 +153,24 @@ export async function deliverReport(
     }
 
     await Sharing.shareAsync(fileUri, {
-      mimeType: "text/csv",
-      UTI: "public.comma-separated-values-text",
-      dialogTitle: "Send CSV report on WhatsApp",
+      mimeType,
+      UTI: uti,
+      dialogTitle: "Send Excel report on WhatsApp",
     });
-    return "Choose WhatsApp to attach and send the CSV report.";
+    return "Choose WhatsApp to attach and send the Excel report.";
   }
 
   if (action === "email") {
     if (await MailComposer.isAvailableAsync()) {
       const result = await MailComposer.composeAsync({
-        subject: `Silai Saathi report | ${delivery.day.dateLabel}`,
-        body: text,
+        subject: report.subjectText,
+        body: report.bodyText,
         attachments: [fileUri],
       });
 
       return result.status === "cancelled"
         ? "Email draft cancelled."
-        : "Email draft opened with the CSV attached.";
+        : "Email draft opened with the Excel report attached.";
     }
 
     if (!(await Sharing.isAvailableAsync())) {
@@ -181,11 +178,11 @@ export async function deliverReport(
     }
 
     await Sharing.shareAsync(fileUri, {
-      mimeType: "text/csv",
-      UTI: "public.comma-separated-values-text",
-      dialogTitle: "Send CSV report by email",
+      mimeType,
+      UTI: uti,
+      dialogTitle: "Send Excel report by email",
     });
-    return "Choose your email app to attach and send the CSV report.";
+    return "Choose your email app to attach and send the Excel report.";
   }
 
   if (!(await Sharing.isAvailableAsync())) {
@@ -193,9 +190,9 @@ export async function deliverReport(
   }
 
   await Sharing.shareAsync(fileUri, {
-    mimeType: "text/csv",
-    UTI: "public.comma-separated-values-text",
-    dialogTitle: "Save CSV report",
+    mimeType,
+    UTI: uti,
+    dialogTitle: "Save Excel report",
   });
-  return "Choose Save to Files or another app to keep the CSV report.";
+  return "Choose Save to Files or another app to keep the Excel report.";
 }

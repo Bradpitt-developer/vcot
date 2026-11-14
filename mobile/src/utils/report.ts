@@ -1,45 +1,31 @@
-import type { Department, WorkEntry } from "../types";
+import type { Department } from "../types";
 
 export type ReportDepartment = "ALL" | Department;
 
-export type ReportDay = {
-  id: string;
-  date: string;
-  title: string;
+export type ReportRange = {
+  from: string;
+  to: string;
   dateLabel: string;
-  shortDateLabel: string;
-  isToday: boolean;
 };
 
 const REPORT_TIME_ZONE = "Asia/Kolkata";
 const DAY_MS = 86_400_000;
 
-const pad = (value: number) => String(value).padStart(2, "0");
-
-function partsInTimeZone(date: Date, timeZone: string) {
+function dateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
+    timeZone: REPORT_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
   }).formatToParts(date);
 
   return Object.fromEntries(
-    parts
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
   );
 }
 
-export function dateKeyInTimeZone(
-  date: Date,
-  timeZone: string = REPORT_TIME_ZONE,
-): string {
-  const parts = partsInTimeZone(date, timeZone);
+export function dateKeyInTimeZone(date: Date): string {
+  const parts = dateParts(date);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
@@ -50,138 +36,61 @@ function dateKeyToUtc(key: string): number {
 
 function utcKey(epochMs: number): string {
   const date = new Date(epochMs);
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
 }
 
-function formatUtcDate(
-  epochMs: number,
-  options: Intl.DateTimeFormatOptions,
-): string {
+export function getCombinedReportRange(): ReportRange {
+  const today = dateKeyInTimeZone(new Date());
+  const from = utcKey(dateKeyToUtc(today) - 30 * DAY_MS);
+
+  return {
+    from,
+    to: today,
+    dateLabel: `${formatDisplayDate(from)} – ${formatDisplayDate(today)}`,
+  };
+}
+
+export function formatDisplayDate(key: string): string {
   return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
     timeZone: "UTC",
-    ...options,
-  }).format(new Date(epochMs));
+  }).format(new Date(dateKeyToUtc(key)));
 }
 
-export function getReportDays(count = 31): ReportDay[] {
-  const todayKey = dateKeyInTimeZone(new Date());
-  const todayMs = dateKeyToUtc(todayKey);
+export function parseDisplayDate(value: string): string | null {
+  const match = value.trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (!match) return null;
 
-  return Array.from({ length: count }, (_, index) => {
-    const epochMs = todayMs - index * DAY_MS;
-    const date = utcKey(epochMs);
-    const title =
-      index === 0
-        ? "Today"
-        : index === 1
-          ? "Yesterday"
-          : `${index} days ago`;
+  const [, rawDay, rawMonth, rawYear] = match;
+  const day = Number(rawDay);
+  const month = Number(rawMonth);
+  const year = Number(rawYear);
+  const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const date = new Date(Date.UTC(year, month - 1, day));
 
-    return {
-      id: date,
-      date,
-      title,
-      dateLabel: formatUtcDate(epochMs, {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-      shortDateLabel: formatUtcDate(epochMs, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }),
-      isToday: index === 0,
-    };
-  });
-}
-
-function csvCell(value: unknown): string {
-  const original = value == null ? "" : String(value);
-  const formulaSafe = /^[=+\-@]/.test(original) ? `'${original}` : original;
-  const escaped = formulaSafe.replace(/"/g, '""');
-
-  return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
-}
-
-const csvDateFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: REPORT_TIME_ZONE,
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-const csvTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: REPORT_TIME_ZONE,
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-export function workEntriesToCsv(entries: WorkEntry[]): string {
-  const rows = [...entries].sort(
-    (left, right) =>
-      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-  );
-
-  const header = [
-    "Date",
-    "Time",
-    "Entry ID",
-    "Employee",
-    "Department",
-    "Operation",
-    "Lot Number",
-    "Quantity",
-    "Manager",
-  ];
-
-  const lines = [header.map(csvCell).join(",")];
-
-  for (const entry of rows) {
-    const createdAt = new Date(entry.createdAt);
-    lines.push(
-      [
-        csvDateFormatter.format(createdAt),
-        csvTimeFormatter.format(createdAt),
-        csvCell(entry.id),
-        csvCell(entry.employeeName),
-        csvCell(entry.department === "PETTICOAT" ? "Petticoat" : "RMG"),
-        csvCell(entry.operationName),
-        csvCell(entry.lotNo),
-        String(entry.quantity),
-        csvCell(entry.managerName),
-      ].join(","),
-    );
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
   }
 
-  // A UTF-8 BOM helps Microsoft Excel detect the file's encoding.
-  return `\uFEFF${lines.join("\r\n")}`;
+  return iso;
 }
 
-export function reportFileName(
-  day: Pick<ReportDay, "date">,
-  department: ReportDepartment,
-): string {
-  const departmentPart =
-    department === "ALL" ? "all" : department.toLowerCase();
-
-  return `silai-saathi_${departmentPart}_${day.date}.csv`;
+export function calculateRangeInclusiveDays(from: string, to: string): number {
+  return Math.round((dateKeyToUtc(to) - dateKeyToUtc(from)) / DAY_MS) + 1;
 }
 
 export function reportDepartmentLabel(department: ReportDepartment): string {
   if (department === "PETTICOAT") return "Petticoat";
   if (department === "RMG") return "RMG";
   return "All sections";
-}
-
-export function reportSummary(entries: WorkEntry[]): {
-  entries: number;
-  pieces: number;
-} {
-  return {
-    entries: entries.length,
-    pieces: entries.reduce((sum, entry) => sum + entry.quantity, 0),
-  };
 }

@@ -171,6 +171,20 @@ export type CreateWorkEntryInput = {
   quantity: number;
 };
 
+export type EmployeeReportQuery = {
+  from: string;
+  to: string;
+  department: "ALL" | Department;
+  operationId: string;
+  status: "completed" | "uncompleted";
+};
+
+export type EmployeeReportFile = {
+  filename: string;
+  contentType: string;
+  base64: string;
+};
+
 export type DataSource = {
   loginAdmin(username: string, password: string): Promise<LoginResult>;
   loginManager(
@@ -215,5 +229,6 @@ export type DataSource = {
     date: string;
     department?: Department;
   }): Promise<WorkEntry[]>;
+  adminEmployeeReport(input: EmployeeReportQuery): Promise<EmployeeReportFile>;
   entries(department?: Department, limit?: number): Promise<WorkEntry[]>;
 };

@@ -1228,6 +1228,13 @@ export const demoDataSource: DataSource = {
     return operation;
   },
 
+  async adminEmployeeReport() {
+    throw new DemoError(
+      "Excel reports are available only in live mode.",
+      403
+    );
+  },
+
   async adminReportEntries(input) {
     const db = await getDatabase();
     requireAdmin(db);
