@@ -68,13 +68,21 @@ function validateUsername(value: unknown): ValidationResult<string> {
 }
 
 function validatePassword(value: unknown): ValidationResult<string> {
-  if (typeof value !== "string" || value.length < 8 || value.length > 72) {
+  if (typeof value !== "string") {
     return {
       ok: false,
-      error: "Password must be between 8 and 72 characters.",
+      error: "Password is required.",
     };
   }
-  return { ok: true, value };
+
+  const password = value.trim();
+  if (password.length < 4 || password.length > 72) {
+    return {
+      ok: false,
+      error: "Password must be at least 4 characters long.",
+    };
+  }
+  return { ok: true, value: password };
 }
 
 function validateDepartment(value: unknown): ValidationResult<Department> {

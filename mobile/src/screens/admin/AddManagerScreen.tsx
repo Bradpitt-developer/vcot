@@ -55,8 +55,8 @@ export function AddManagerScreen({ navigation }: Props) {
       );
       return;
     }
-    if (password.length < 8 || password.length > 72) {
-      setError("Password must be between 8 and 72 characters.");
+    if (password.trim().length < 4 || password.length > 72) {
+      setError("Password must be at least 4 characters long.");
       return;
     }
 
@@ -152,7 +152,7 @@ export function AddManagerScreen({ navigation }: Props) {
             <TextField
               label="Password"
               required
-              hint="At least 8 characters"
+              hint="At least 4 characters"
               placeholder="Create a password"
               value={password}
               onChangeText={setPassword}

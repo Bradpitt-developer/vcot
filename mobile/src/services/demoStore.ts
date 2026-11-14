@@ -515,10 +515,15 @@ function validateUsername(value: unknown): string {
 }
 
 function validatePassword(value: unknown): string {
-  if (typeof value !== "string" || value.length < 8 || value.length > 72) {
-    throw new DemoError("Password must be between 8 and 72 characters.");
+  if (typeof value !== "string") {
+    throw new DemoError("Password is required.");
   }
-  return value;
+
+  const password = value.trim();
+  if (password.length < 4 || password.length > 72) {
+    throw new DemoError("Password must be at least 4 characters long.");
+  }
+  return password;
 }
 
 function validateDepartment(value: unknown): Department {

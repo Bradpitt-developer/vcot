@@ -36,7 +36,7 @@ The admin can:
 - See active manager, employee, and operation counts.
 - See today's entry and piece totals plus recent production.
 - Create manager logins with a name, login ID, password, and Petticoat/RMG
-  designation.
+  designation, then search by manager or employee name to edit details or reset a manager’s password.
 - Add employees to the Petticoat or RMG section.
 - Create and disable operations.
 - Search managers and employees, and permanently delete records that have no

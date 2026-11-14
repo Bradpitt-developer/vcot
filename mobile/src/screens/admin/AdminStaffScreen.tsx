@@ -2,8 +2,10 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,13 +15,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Search, Trash2, X } from "lucide-react-native";
+import { Plus, Search, Trash2, KeyRound, X } from "lucide-react-native";
 
 import { Avatar } from "../../components/Avatar";
-import { IconButton } from "../../components/Buttons";
+import { IconButton, PrimaryButton } from "../../components/Buttons";
 import { DepartmentPill } from "../../components/DepartmentPill";
 import { EmptyState } from "../../components/EmptyState";
-import { ErrorBanner } from "../../components/Form";
+import { ErrorBanner, TextField } from "../../components/Form";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { colors, radii, spacing } from "../../constants/theme";
 import { useToast } from "../../context/ToastContext";
@@ -45,6 +47,11 @@ export function AdminStaffScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [resetManager, setResetManager] = useState<Manager | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
   const loadedOnce = useRef(false);
 
   const rootNavigation =
@@ -128,6 +135,55 @@ export function AdminStaffScreen({ navigation }: Props) {
       showToast(errorMessage(deleteError), "error");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function openManagerPasswordReset(manager: Manager) {
+    setResetManager(manager);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError(null);
+  }
+
+  function closeManagerPasswordReset() {
+    setResetManager(null);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError(null);
+    setSavingPassword(false);
+  }
+
+  async function resetManagerPassword() {
+    if (!resetManager) return;
+
+    const password = newPassword.trim();
+    const confirmation = confirmPassword.trim();
+
+    if (password.length < 4 || password.length > 72) {
+      setPasswordError("Use at least 4 characters.");
+      return;
+    }
+    if (password !== confirmation) {
+      setPasswordError("The two passwords do not match.");
+      return;
+    }
+
+    setSavingPassword(true);
+    setPasswordError(null);
+
+    try {
+      await data.updateManager(resetManager.id, { password });
+      setManagers((current) =>
+        (current || []).map((item) =>
+          item.id === resetManager.id ? item : item
+        )
+      );
+      showToast(`Password reset for ${resetManager.name}.`, "success");
+      closeManagerPasswordReset();
+    } catch (resetError) {
+      setPasswordError(errorMessage(resetError));
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -318,6 +374,7 @@ export function AdminStaffScreen({ navigation }: Props) {
               <ManagerRow
                 manager={item as Manager}
                 busy={busyId === item.id}
+                onResetPassword={() => openManagerPasswordReset(item as Manager)}
                 onDelete={() => void confirmManagerDelete(item as Manager)}
               />
             ) : (
@@ -348,6 +405,108 @@ export function AdminStaffScreen({ navigation }: Props) {
           }
         />
       )}
+
+      <Modal
+        visible={Boolean(resetManager)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeManagerPasswordReset}
+      >
+        <View style={styles.resetBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close password reset"
+            style={StyleSheet.absoluteFill}
+            onPress={closeManagerPasswordReset}
+          />
+          <View style={styles.resetCard}>
+            <View style={styles.resetHeader}>
+              <View style={styles.resetHeaderIcon}>
+                <KeyRound size={20} color={colors.primaryDark} strokeWidth={2.2} />
+              </View>
+              <View style={styles.resetHeaderText}>
+                <Text style={styles.resetTitle}>Reset manager password</Text>
+                <Text style={styles.resetSubtitle} numberOfLines={1}>
+                  {resetManager?.name}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close password reset"
+                onPress={closeManagerPasswordReset}
+                style={({ pressed }) => [
+                  styles.resetCloseButton,
+                  pressed && styles.resetCloseButtonPressed,
+                ]}
+              >
+                <X size={18} color={colors.muted} strokeWidth={2.3} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.resetContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <TextField
+                label="New password"
+                required
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={newPassword}
+                onChangeText={(value) => {
+                  setNewPassword(value);
+                  setPasswordError(null);
+                }}
+                placeholder="e.g. 10/9/2004 or A123"
+                autoComplete="password-new"
+                textContentType="newPassword"
+              />
+              <TextField
+                label="Confirm new password"
+                required
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={confirmPassword}
+                onChangeText={(value) => {
+                  setConfirmPassword(value);
+                  setPasswordError(null);
+                }}
+                placeholder="Type it again"
+                autoComplete="password-new"
+                textContentType="newPassword"
+              />
+              <ErrorBanner message={passwordError} />
+              <Text style={styles.resetHint}>
+                Letters, digits and slashes are allowed. Use at least 4 characters.
+              </Text>
+              <View style={styles.resetActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel password reset"
+                  disabled={savingPassword}
+                  onPress={closeManagerPasswordReset}
+                  style={({ pressed }) => [
+                    styles.cancelButton,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <PrimaryButton
+                  label="Reset password"
+                  onPress={() => void resetManagerPassword()}
+                  loading={savingPassword}
+                  disabled={!newPassword.trim() || !confirmPassword.trim()}
+                  icon={<KeyRound size={17} color={colors.white} strokeWidth={2.3} />}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -355,10 +514,12 @@ export function AdminStaffScreen({ navigation }: Props) {
 function ManagerRow({
   manager,
   busy,
+  onResetPassword,
   onDelete,
 }: {
   manager: Manager;
   busy: boolean;
+  onResetPassword: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -379,19 +540,33 @@ function ManagerRow({
           <DepartmentPill department={manager.department} small />
         </View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Delete manager ${manager.name}`}
-        accessibilityState={{ disabled: busy }}
-        disabled={busy}
-        onPress={onDelete}
-        style={({ pressed }) => [
-          styles.deleteButton,
-          { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
-        ]}
-      >
-        <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
-      </Pressable>
+      <View style={styles.rowActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Reset password for ${manager.name}`}
+          disabled={busy}
+          onPress={onResetPassword}
+          style={({ pressed }) => [
+            styles.resetIconButton,
+            { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
+          ]}
+        >
+          <KeyRound size={17} color={colors.primaryDark} strokeWidth={2.2} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete manager ${manager.name}`}
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onPress={onDelete}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { opacity: busy ? 0.35 : pressed ? 0.65 : 1 },
+          ]}
+        >
+          <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -588,5 +763,104 @@ const styles = StyleSheet.create({
     borderColor: "#F3C5C0",
     alignItems: "center",
     justifyContent: "center",
+  },
+  rowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  resetIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+  },
+  resetBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: colors.overlay,
+    paddingHorizontal: spacing.xl,
+  },
+  resetCard: {
+    maxHeight: "88%",
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    overflow: "hidden",
+  },
+  resetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
+  },
+  resetHeaderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft,
+  },
+  resetHeaderText: {
+    flex: 1,
+  },
+  resetTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  resetSubtitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  resetCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.canvas,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  resetCloseButtonPressed: {
+    backgroundColor: colors.lineSoft,
+  },
+  resetContent: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  resetHint: {
+    color: colors.faint,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: "500",
+  },
+  resetActions: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  cancelButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 46,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.canvas,
+  },
+  cancelButtonText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
