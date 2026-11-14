@@ -1,12 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type {
+  CreateProductionLotInput,
   DataSource,
   Department,
   Employee,
   LoginResult,
   Manager,
   Operation,
+  ProductionLot,
   SessionUser,
   WorkEntry,
 } from "../types";
@@ -20,12 +22,17 @@ type DemoUser = SessionUser & {
   lastLoginAt?: string | null;
 };
 
+type DemoProductionLot = ProductionLot & {
+  completedOperations: string[];
+};
+
 type DemoDatabase = {
   version: 1 | 2;
   users: DemoUser[];
   employees: Employee[];
   operations: Operation[];
   entries: WorkEntry[];
+  productionLots?: DemoProductionLot[];
 };
 
 const STORAGE_KEY = "@silai-saathi/demo-db-v1";
@@ -33,6 +40,7 @@ const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 
 const STARTER_OPERATIONS: Record<Department, string[]> = {
   PETTICOAT: [
+    "Cutting",
     "Kamarpatti",
     "Interlock",
     "Bottom",
@@ -284,6 +292,72 @@ function seedDatabase(): DemoDatabase {
   };
 }
 
+const GUIDED_OPERATIONS = [
+  "Cutting",
+  "Interlock",
+  "Kamarpatti",
+  "Bottom",
+  "Dori",
+  "Nada",
+  "Dhoka",
+  "Folding",
+] as const;
+
+const MIDDLE_OPERATIONS = ["Kamarpatti", "Bottom", "Dori", "Nada"] as const;
+
+type GuidedOperation = (typeof GUIDED_OPERATIONS)[number];
+
+function guidedWorkflowState(completedOperationNames: string[]) {
+  const wanted = new Set(
+    completedOperationNames.map((name) => name.trim().toLowerCase()),
+  );
+  const completed = GUIDED_OPERATIONS.filter((operation) =>
+    wanted.has(operation.toLowerCase()),
+  );
+  const missingMiddle = MIDDLE_OPERATIONS.filter(
+    (operation) => !wanted.has(operation.toLowerCase()),
+  );
+
+  let availableOperations: GuidedOperation[] = [];
+
+  if (!wanted.has("interlock")) {
+    availableOperations = ["Interlock"];
+  } else if (missingMiddle.length > 0) {
+    availableOperations = [...missingMiddle];
+  } else if (!wanted.has("dhoka")) {
+    availableOperations = ["Dhoka"];
+  } else if (!wanted.has("folding")) {
+    availableOperations = ["Folding"];
+  }
+
+  return {
+    completedOperations: completed,
+    availableOperations,
+    currentStage: availableOperations.length
+      ? availableOperations.length > 1
+        ? MIDDLE_OPERATIONS.join(" / ")
+        : availableOperations[0]
+      : "Completed",
+    isComplete: availableOperations.length === 0,
+  };
+}
+
+function toDemoProductionLot(lot: DemoProductionLot): ProductionLot {
+  const state = guidedWorkflowState(lot.completedOperations);
+
+  return {
+    ...lot,
+    currentStage: state.currentStage,
+    completedOperations: state.completedOperations,
+    availableOperations: state.availableOperations,
+  };
+}
+
+function productionLots(db: DemoDatabase): DemoProductionLot[] {
+  db.productionLots ??= [];
+  return db.productionLots;
+}
+
 function migrateOperations(db: DemoDatabase): void {
   const createdAt = new Date().toISOString();
 
@@ -345,10 +419,12 @@ async function getDatabase(): Promise<DemoDatabase> {
         if (parsed.version === 1) {
           migrateOperations(parsed);
           parsed.version = 2;
+          parsed.productionLots ??= [];
           await persist(parsed);
           return parsed;
         }
 
+        parsed.productionLots ??= [];
         cache = parsed;
         return parsed;
       }
@@ -551,6 +627,204 @@ export const demoDataSource: DataSource = {
         todayPieces: today.reduce((sum, entry) => sum + entry.quantity, 0),
       },
     };
+  },
+
+  async managerLots(): Promise<ProductionLot[]> {
+    const db = await getDatabase();
+    const manager = requireManager(db);
+    const department = manager.department as Department;
+
+    if (department !== "PETTICOAT") return [];
+
+    return productionLots(db)
+      .filter((lot) => lot.department === department && lot.status === "active")
+      .map(toDemoProductionLot);
+  },
+
+  async createProductionLot(input: CreateProductionLotInput) {
+    const db = await getDatabase();
+    const manager = requireManager(db);
+    const department = manager.department as Department;
+
+    if (department !== "PETTICOAT") {
+      throw new DemoError(
+        "The guided production workflow is available only in Petticoat.",
+        403
+      );
+    }
+
+    const employee = db.employees.find(
+      (candidate) => candidate.id === input.employeeId
+    );
+    if (!employee || !employee.isActive || employee.department !== department) {
+      throw new DemoError(
+        "That employee is not available in your section.",
+        400
+      );
+    }
+
+    const lotNo = validateLotNo(input.lotNo);
+    const duplicate = productionLots(db).some(
+      (lot) =>
+        lot.status === "active" &&
+        lot.department === department &&
+        lot.lotNo.toLowerCase() === lotNo.toLowerCase()
+    );
+
+    if (duplicate) {
+      throw new DemoError(
+        `Lot ${lotNo} is currently in use. Complete it before reusing it.`,
+        409
+      );
+    }
+
+    const cuttingOperation = db.operations.find(
+      (operation) =>
+        operation.department === department &&
+        operation.name.toLowerCase() === "cutting" &&
+        operation.isActive
+    );
+
+    if (!cuttingOperation) {
+      throw new DemoError(
+        "Cutting operation is not available. Please ask admin to add it.",
+        400
+      );
+    }
+
+    const meter = Number(input.meter);
+    const area = Number(input.area);
+    const width = Number(input.width);
+    const panel = Number(input.panel);
+    const quantity = validateQuantity(input.quantity);
+
+    if (
+      !Number.isFinite(meter) ||
+      !Number.isFinite(area) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(panel) ||
+      meter < 0 ||
+      area < 0 ||
+      width < 0 ||
+      panel < 0
+    ) {
+      throw new DemoError("Meter, area, width and panel must be valid numbers.");
+    }
+
+    const now = new Date().toISOString();
+    const lot: DemoProductionLot = {
+      id: makeId("lot"),
+      managerId: manager.id,
+      department,
+      lotNo,
+      meter,
+      area,
+      width,
+      panel,
+      remarks: typeof input.remarks === "string" ? input.remarks.trim() || null : null,
+      quantity,
+      status: "active",
+      currentStage: "Interlock",
+      completedOperations: ["Cutting"],
+      availableOperations: ["Interlock"],
+      createdAt: now,
+      completedAt: null,
+    };
+
+    productionLots(db).push(lot);
+    db.entries.push({
+      id: makeId("entry"),
+      employeeId: employee.id,
+      employeeName: employee.name,
+      managerId: manager.id,
+      managerName: manager.name,
+      operationId: cuttingOperation.id,
+      operationName: cuttingOperation.name,
+      lotNo,
+      quantity,
+      department,
+      createdAt: now,
+    });
+    await persist(db);
+    return toDemoProductionLot(lot);
+  },
+
+  async completeProductionStep(input) {
+    const db = await getDatabase();
+    const manager = requireManager(db);
+    const department = manager.department as Department;
+    const lot = productionLots(db).find(
+      (candidate) => candidate.id === input.lotId
+    );
+
+    if (!lot || lot.department !== department || lot.status !== "active") {
+      throw new DemoError("Production lot not found.", 404);
+    }
+
+    const employee = db.employees.find(
+      (candidate) => candidate.id === input.employeeId
+    );
+    if (
+      !employee ||
+      !employee.isActive ||
+      employee.department !== department
+    ) {
+      throw new DemoError(
+        "That employee is not available in your section.",
+        400
+      );
+    }
+
+    const operation = db.operations.find(
+      (candidate) => candidate.id === input.operationId
+    );
+    if (!operation || !operation.isActive || operation.department !== department) {
+      throw new DemoError(
+        "That operation is not available in your section.",
+        400
+      );
+    }
+
+    const state = guidedWorkflowState(lot.completedOperations);
+    if (
+      !state.availableOperations.some(
+        (candidate) => candidate.toLowerCase() === operation.name.toLowerCase()
+      )
+    ) {
+      throw new DemoError(
+        `Complete ${state.availableOperations.join(" or ")} first.`,
+        400
+      );
+    }
+
+    const completedOperations = [...lot.completedOperations, operation.name];
+    const finalState = guidedWorkflowState(completedOperations);
+    const now = new Date().toISOString();
+
+    lot.completedOperations = completedOperations;
+    lot.currentStage = finalState.currentStage;
+    lot.availableOperations = finalState.availableOperations;
+
+    if (finalState.isComplete) {
+      lot.status = "completed";
+      lot.completedAt = now;
+    }
+
+    db.entries.push({
+      id: makeId("entry"),
+      employeeId: employee.id,
+      employeeName: employee.name,
+      managerId: manager.id,
+      managerName: manager.name,
+      operationId: operation.id,
+      operationName: operation.name,
+      lotNo: lot.lotNo,
+      quantity: lot.quantity,
+      department,
+      createdAt: now,
+    });
+    await persist(db);
+    return toDemoProductionLot(lot);
   },
 
   async managerEntries(limit = 100) {

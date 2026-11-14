@@ -33,6 +33,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import type { ManagerTabParamList } from "../../navigation/types";
 import { data } from "../../services/data";
+import { ProductionWorkflowCard } from "./ProductionWorkflowCard";
 import type { ManagerHomeData } from "../../types";
 import { confirmAction } from "../../utils/confirm";
 import { errorMessage, firstName } from "../../utils/format";
@@ -251,6 +252,12 @@ export function ManagerHomeScreen({ navigation }: Props) {
               </View>
             </View>
 
+            {user?.department === "PETTICOAT" ? (
+              <ProductionWorkflowCard
+                home={home}
+                onSaved={() => void loadHome({ quiet: true })}
+              />
+            ) : (
             <View style={styles.formCard}>
               <View style={styles.formHeader}>
                 <View style={styles.formIcon}>
@@ -359,6 +366,7 @@ export function ManagerHomeScreen({ navigation }: Props) {
                 </Text>
               ) : null}
             </View>
+            )}
 
             <View style={styles.recentBlock}>
               <SectionHeader

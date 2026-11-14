@@ -70,6 +70,39 @@ CREATE INDEX IF NOT EXISTS operations_department_active_idx
   ON public.operations (department, is_active, name);
 
 -- ---------------------------------------------------------------------------
+-- Guided production lots: one active cycle per Petticoat lot number
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.production_lots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  manager_id uuid NOT NULL,
+  department text NOT NULL CHECK (department = 'PETTICOAT'),
+  lot_number text NOT NULL CHECK (char_length(trim(lot_number)) BETWEEN 1 AND 40),
+  meter numeric(12, 3) NOT NULL CHECK (meter >= 0),
+  area numeric(12, 3) NOT NULL CHECK (area >= 0),
+  width numeric(12, 3) NOT NULL CHECK (width >= 0),
+  panel numeric(12, 3) NOT NULL CHECK (panel >= 0),
+  remarks text CHECK (remarks IS NULL OR char_length(trim(remarks)) <= 300),
+  quantity integer NOT NULL CHECK (quantity > 0 AND quantity <= 1000000),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  CONSTRAINT production_lots_manager_fkey
+    FOREIGN KEY (manager_id) REFERENCES public.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS production_lots_active_lot_unique
+  ON public.production_lots (department, lower(lot_number))
+  WHERE status = 'active';
+
+CREATE INDEX IF NOT EXISTS production_lots_manager_status_idx
+  ON public.production_lots (manager_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS production_lots_department_status_idx
+  ON public.production_lots (department, status, created_at DESC);
+
+-- ---------------------------------------------------------------------------
 -- Submitted production entries
 -- ---------------------------------------------------------------------------
 
@@ -82,13 +115,31 @@ CREATE TABLE IF NOT EXISTS public.work_entries (
   lot_no text NOT NULL CHECK (char_length(trim(lot_no)) BETWEEN 1 AND 40),
   quantity integer NOT NULL CHECK (quantity > 0 AND quantity <= 1000000),
   created_at timestamptz NOT NULL DEFAULT now(),
+  production_lot_id uuid,
   CONSTRAINT work_entries_employee_fkey
     FOREIGN KEY (employee_id) REFERENCES public.employees (id) ON DELETE RESTRICT,
   CONSTRAINT work_entries_manager_fkey
     FOREIGN KEY (manager_id) REFERENCES public.staff_users (id) ON DELETE RESTRICT,
   CONSTRAINT work_entries_operation_fkey
-    FOREIGN KEY (operation_id) REFERENCES public.operations (id) ON DELETE RESTRICT
+    FOREIGN KEY (operation_id) REFERENCES public.operations (id) ON DELETE RESTRICT,
+  CONSTRAINT work_entries_production_lot_fkey
+    FOREIGN KEY (production_lot_id) REFERENCES public.production_lots (id) ON DELETE RESTRICT
 );
+
+ALTER TABLE public.work_entries
+  ADD COLUMN IF NOT EXISTS production_lot_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'work_entries_production_lot_fkey'
+  ) THEN
+    ALTER TABLE public.work_entries
+      ADD CONSTRAINT work_entries_production_lot_fkey
+      FOREIGN KEY (production_lot_id) REFERENCES public.production_lots (id) ON DELETE RESTRICT;
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS work_entries_manager_created_idx
   ON public.work_entries (manager_id, created_at DESC);
@@ -101,6 +152,9 @@ CREATE INDEX IF NOT EXISTS work_entries_created_idx
 
 CREATE INDEX IF NOT EXISTS work_entries_employee_idx
   ON public.work_entries (employee_id);
+
+CREATE INDEX IF NOT EXISTS work_entries_production_lot_idx
+  ON public.work_entries (production_lot_id);
 
 -- ---------------------------------------------------------------------------
 -- Updated-at trigger
@@ -115,6 +169,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS production_lots_set_updated_at ON public.production_lots;
+CREATE TRIGGER production_lots_set_updated_at
+  BEFORE UPDATE ON public.production_lots
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS staff_users_set_updated_at ON public.staff_users;
 CREATE TRIGGER staff_users_set_updated_at
@@ -140,8 +199,10 @@ ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.work_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.production_lots ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.staff_users IS 'Admin and Petticoat/RMG manager login accounts.';
 COMMENT ON TABLE public.employees IS 'Employees shown in the manager work-entry dropdown.';
 COMMENT ON TABLE public.operations IS 'Department-specific operations shown in the manager dropdown.';
 COMMENT ON TABLE public.work_entries IS 'Production entries submitted by managers.';
+COMMENT ON TABLE public.production_lots IS 'Guided Petticoat production lot cycles from Cutting through Folding.';

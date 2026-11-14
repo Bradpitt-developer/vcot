@@ -182,12 +182,15 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Operations: 7 Petticoat + 7 RMG
--- These are the operations shown in the manager dropdown after login.
+-- Operations: 8 Petticoat + 7 RMG.
+-- Cutting is required for the guided Petticoat production workflow.
+-- ---------------------------------------------------------------------------
+-- Operations shown in the manager dropdown after login.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO public.operations (name, department)
 VALUES
+  ('Cutting', 'PETTICOAT'),
   ('Kamarpatti', 'PETTICOAT'),
   ('Interlock', 'PETTICOAT'),
   ('Bottom', 'PETTICOAT'),
@@ -209,7 +212,7 @@ ON CONFLICT DO NOTHING;
 UPDATE public.operations
 SET is_active = false
 WHERE name IN (
-  'Cutting', 'Stitching', 'Elastic fitting', 'Finishing',
+  'Stitching', 'Elastic fitting', 'Finishing',
   'Packing', 'Checking', 'Ironing'
 )
 AND department IN ('PETTICOAT', 'RMG')

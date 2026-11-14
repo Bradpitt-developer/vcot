@@ -8,6 +8,7 @@ import { pool } from "./db";
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
 import managerRoutes from "./routes/manager";
+import managerLotRoutes from "./routes/manager-lots";
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use(
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/manager", managerRoutes);
+app.use("/manager", managerLotRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found." });

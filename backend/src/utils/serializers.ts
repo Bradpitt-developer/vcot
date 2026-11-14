@@ -1,8 +1,13 @@
+import {
+  guidedWorkflowState,
+} from "./guided-workflow";
 import type {
   Employee,
   EmployeeRow,
   Operation,
   OperationRow,
+  ProductionLot,
+  ProductionLotRow,
   StaffUser,
   StaffUserRow,
   Timestamp,
@@ -67,5 +72,31 @@ export function toEntry(row: WorkEntryRow): WorkEntry {
     quantity: Number(row.quantity),
     department: row.department,
     createdAt: toIso(row.created_at),
+  };
+}
+
+export function toProductionLot(
+  row: ProductionLotRow,
+  completedOperationNames: string[],
+): ProductionLot {
+  const workflow = guidedWorkflowState(completedOperationNames);
+
+  return {
+    id: row.id,
+    managerId: row.manager_id,
+    department: row.department,
+    lotNo: row.lot_number,
+    meter: Number(row.meter),
+    area: Number(row.area),
+    width: Number(row.width),
+    panel: Number(row.panel),
+    remarks: row.remarks,
+    quantity: Number(row.quantity),
+    status: row.status,
+    currentStage: workflow.currentStage,
+    completedOperations: workflow.completedOperations,
+    availableOperations: workflow.availableOperations,
+    createdAt: toIso(row.created_at),
+    completedAt: toNullableIso(row.completed_at),
   };
 }

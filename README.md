@@ -17,10 +17,12 @@ short forms, clear section colours, and no unnecessary settings.
 1. Open the app and tap **Login**.
 2. Choose **Petticoat** or **RMG**.
 3. Sign in with the login ID and password created by the admin.
-4. On **Add work**, choose an employee and an operation from the manager's
-   section.
-5. Enter a lot number, then type the quantity directly or use **− / +**.
-   Quick-add buttons for **+10**, **+50**, and **+100** make larger quantities faster to enter.
+4. Petticoat managers use the guided lot workflow. Start a lot in **Cutting**
+   with employee, meter, area, width, panel, remarks, lot number, and quantity.
+   Continue the same lot through Interlock, Kamarpatti/Bottom/Dori/Nada in any
+   order, Dhoka, and Folding. The quantity carries automatically.
+5. RMG managers use **Add work**: choose an employee, operation, lot number,
+   and quantity.
 6. Review today's entries, seven-day history, or all entries in **History**.
 7. View login details and log out from **Account**.
 

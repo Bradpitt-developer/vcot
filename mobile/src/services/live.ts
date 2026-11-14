@@ -14,6 +14,8 @@ import type {
   Manager,
   ManagerHomeData,
   Operation,
+  ProductionLot,
+  CreateProductionLotInput,
   SessionUser,
   WorkEntry,
 } from "../types";
@@ -108,6 +110,33 @@ export const liveDataSource: DataSource = {
 
   async managerHome(): Promise<ManagerHomeData> {
     return request<ManagerHomeData>("/manager/home");
+  },
+
+  async managerLots(): Promise<ProductionLot[]> {
+    const result = await request<{ lots: ProductionLot[] }>("/manager/lots");
+    return result.lots;
+  },
+
+  async createProductionLot(input): Promise<ProductionLot> {
+    const result = await request<{ lot: ProductionLot }>("/manager/lots", {
+      method: "POST",
+      body: input,
+    });
+    return result.lot;
+  },
+
+  async completeProductionStep(input): Promise<ProductionLot> {
+    const result = await request<{ lot: ProductionLot }>(
+      `/manager/lots/${input.lotId}/steps`,
+      {
+        method: "POST",
+        body: {
+          employeeId: input.employeeId,
+          operationId: input.operationId,
+        },
+      },
+    );
+    return result.lot;
   },
 
   async managerEntries(limit = 100): Promise<WorkEntry[]> {

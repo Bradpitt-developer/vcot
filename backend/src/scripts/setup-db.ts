@@ -13,6 +13,7 @@ loadEnv({ path: path.join(backendRoot, ".env"), quiet: true });
 const ADMIN_USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 const DEFAULT_OPERATIONS: Record<Department, readonly string[]> = {
   PETTICOAT: [
+    "Cutting",
     "Kamarpatti",
     "Interlock",
     "Bottom",
@@ -33,7 +34,6 @@ const DEFAULT_OPERATIONS: Record<Department, readonly string[]> = {
 };
 
 const RETIRED_STARTER_OPERATIONS: readonly string[] = [
-  "Cutting",
   "Stitching",
   "Elastic fitting",
   "Finishing",

@@ -74,6 +74,36 @@ export type LoginResult = {
   user: SessionUser;
 };
 
+export type ProductionLot = {
+  id: string;
+  managerId: string;
+  department: Department;
+  lotNo: string;
+  meter: number;
+  area: number;
+  width: number;
+  panel: number;
+  remarks: string | null;
+  quantity: number;
+  status: "active" | "completed";
+  currentStage: string;
+  completedOperations: string[];
+  availableOperations: string[];
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type CreateProductionLotInput = {
+  employeeId: string;
+  lotNo: string;
+  meter: number;
+  area: number;
+  width: number;
+  panel: number;
+  remarks?: string;
+  quantity: number;
+};
+
 export type ManagerHomeData = {
   employees: Employee[];
   operations: Operation[];
@@ -148,6 +178,15 @@ export type DataSource = {
   me(): Promise<SessionUser>;
 
   managerHome(): Promise<ManagerHomeData>;
+  managerLots(): Promise<ProductionLot[]>;
+  createProductionLot(
+    input: CreateProductionLotInput,
+  ): Promise<ProductionLot>;
+  completeProductionStep(input: {
+    lotId: string;
+    employeeId: string;
+    operationId: string;
+  }): Promise<ProductionLot>;
   managerEntries(limit?: number): Promise<WorkEntry[]>;
   createWorkEntry(input: CreateWorkEntryInput): Promise<WorkEntry>;
 

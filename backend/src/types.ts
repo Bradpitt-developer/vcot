@@ -86,6 +86,41 @@ export interface OperationRow extends OperationBaseRow {
   created_at: Timestamp;
 }
 
+export interface ProductionLot {
+  id: string;
+  managerId: string;
+  department: Department;
+  lotNo: string;
+  meter: number;
+  area: number;
+  width: number;
+  panel: number;
+  remarks: string | null;
+  quantity: number;
+  status: "active" | "completed";
+  currentStage: string;
+  completedOperations: string[];
+  availableOperations: string[];
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ProductionLotRow {
+  id: string;
+  manager_id: string;
+  department: Department;
+  lot_number: string;
+  meter: number;
+  area: number;
+  width: number;
+  panel: number;
+  remarks: string | null;
+  quantity: number;
+  status: "active" | "completed";
+  created_at: Timestamp;
+  completed_at: Timestamp | null;
+}
+
 export interface WorkEntryRow {
   id: string;
   employee_id: string;
