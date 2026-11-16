@@ -135,7 +135,7 @@ This script:
 
 - applies `backend/supabase/schema.sql`,
 - creates the first admin if no admin exists,
-- adds starter Petticoat operations.
+- adds starter Petticoat and RMG operations.
 
 It is safe to run again. Existing staff accounts and work entries are kept.
 Operations are only added when they are missing. If an admin already exists, the
@@ -167,14 +167,16 @@ You can create everything manually from the Supabase dashboard:
 `seed.sql` creates:
 
 - The first admin account: login ID `admin`, password `Admin@123`.
-- 5 Petticoat manager accounts, all with password `Manager@123`:
-  - `peticot1` through `peticot5`
-- 10 Petticoat employees.
-- Eight starter operations: Cutting, Kamarpatti, Interlock, Bottom,
+- 10 manager accounts, all with password `Manager@123`:
+  - Petticoat: `peticot1` through `peticot5`
+    (The department is now Petticoat; existing login IDs were intentionally not renamed.)
+  - RMG: `rmg1` through `rmg5`
+- 20 employees: 10 Petticoat and 10 RMG.
+- Seven starter operations in each section: Kamarpatti, Interlock, Bottom,
   Dhoka, Folding, Dori, and Nada.
 
 If you previously ran an older seed, running the current seed again also
-disables the previous starter operations (Stitching, Elastic fitting,
+disables the previous starter operations (Cutting, Stitching, Elastic fitting,
 Finishing, Packing, Checking, and Ironing). Their work history is kept, and the
 admin can re-enable them from **Setup** if needed.
 
@@ -289,7 +291,7 @@ Then:
 2. Open Expo Go on the phone.
 3. Scan the QR code in the terminal. On Android, Expo Go can scan it from the
    app. On iOS, use the Camera app.
-4. Tap **Login**, then sign in with the admin-created Petticoat login.
+4. Tap **Login**, choose Petticoat or RMG, and sign in with the admin-created login.
 
 ### If the phone cannot reach the API
 
@@ -309,8 +311,8 @@ Then:
 ## 9. First-use checklist
 
 1. Sign in as the admin.
-2. Open **People** and create at least one Petticoat manager.
-3. Add employees.
+2. Open **People** and create at least one Petticoat and one RMG manager.
+3. Add employees to both sections.
 4. Open **Setup** and check the starter operations. Add or disable operations if
    the factory uses different names.
 5. Log out and sign in as a manager.
@@ -393,7 +395,7 @@ testing. Do not use preview mode for real factory accounts.
 
 The schema uses these tables:
 
-- `staff_users` — admins and Petticoat managers.
+- `staff_users` — admins and Petticoat/RMG managers.
 - `employees` — workers shown in section-specific manager dropdowns.
 - `operations` — section-specific operations.
 - `work_entries` — submitted production entries.

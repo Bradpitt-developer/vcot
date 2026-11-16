@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Eye, EyeOff, KeyRound, Scissors } from "lucide-react-native";
+import { Eye, EyeOff, KeyRound, Scissors, Shirt } from "lucide-react-native";
 
 import { PrimaryButton } from "../../components/Buttons";
 import { DemoLoginCard } from "../../components/DemoLoginCard";
@@ -33,7 +33,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, "ManagerLogin">;
 export function ManagerLoginScreen({ navigation, route }: Props) {
   const { department } = route.params;
   const palette = departmentColors[department];
-  const DepartmentIcon = Scissors;
+  const DepartmentIcon = department === "PETTICOAT" ? Scissors : Shirt;
   const { signInManager } = useAuth();
 
   const [username, setUsername] = useState("");
@@ -42,8 +42,9 @@ export function ManagerLoginScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const demoUsername = "petticoat";
-  const demoPassword = "Petticoat@123";
+  const demoUsername = department === "PETTICOAT" ? "petticoat" : "rmg";
+  const demoPassword =
+    department === "PETTICOAT" ? "Petticoat@123" : "Rmg@123";
 
   async function handleLogin() {
     Keyboard.dismiss();

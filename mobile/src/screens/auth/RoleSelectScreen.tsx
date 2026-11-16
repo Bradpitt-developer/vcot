@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Scissors,
   ShieldCheck,
+  Shirt,
 } from "lucide-react-native";
 
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -37,6 +38,12 @@ const roles: Array<{
     title: "Petticoat",
     description: "Manager login for the Petticoat section",
     icon: Scissors,
+  },
+  {
+    department: "RMG",
+    title: "RMG",
+    description: "Manager login for the RMG section",
+    icon: Shirt,
   },
 ];
 

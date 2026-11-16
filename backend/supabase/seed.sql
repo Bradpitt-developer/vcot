@@ -8,6 +8,7 @@
 -- Starter logins:
 --   Admin:        admin        / Admin@123
 --   Petticoat mgr:  peticot1..5  / Manager@123
+--   RMG mgr:      rmg1..5      / Manager@123
 --
 -- IMPORTANT: Change these passwords before entering real factory data.
 --
@@ -60,7 +61,7 @@ END
 $$;
 
 -- ---------------------------------------------------------------------------
--- Managers: 5 Petticoat
+-- Managers: 5 Petticoat + 5 RMG
 -- Password for all seeded managers: Manager@123
 -- ---------------------------------------------------------------------------
 
@@ -106,11 +107,46 @@ VALUES
     '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
     'manager',
     'PETTICOAT'
+  ),
+  (
+    'Vikram Singh',
+    'rmg1',
+    '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
+    'manager',
+    'RMG'
+  ),
+  (
+    'Sanjay Gupta',
+    'rmg2',
+    '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
+    'manager',
+    'RMG'
+  ),
+  (
+    'Rajesh Kumar',
+    'rmg3',
+    '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
+    'manager',
+    'RMG'
+  ),
+  (
+    'Amit Chauhan',
+    'rmg4',
+    '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
+    'manager',
+    'RMG'
+  ),
+  (
+    'Rohit Mehta',
+    'rmg5',
+    '$2b$10$tt2c/KQl2yEUxLj/CkPWLOA0pDA9K5CvfwoGXl8jZlIqcMJlmpZwe',
+    'manager',
+    'RMG'
   )
 ON CONFLICT (username) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- Employees: 10 Petticoat
+-- Employees: 10 Petticoat + 10 RMG
 -- ---------------------------------------------------------------------------
 
 INSERT INTO public.employees (name, department)
@@ -126,7 +162,17 @@ FROM (
     ('Pooja Verma', 'PETTICOAT'),
     ('Ajay Yadav', 'PETTICOAT'),
     ('Neha Gupta', 'PETTICOAT'),
-    ('Suresh Kumar', 'PETTICOAT')
+    ('Suresh Kumar', 'PETTICOAT'),
+    ('Rakesh Kumar', 'RMG'),
+    ('Priya Sharma', 'RMG'),
+    ('Sandeep Yadav', 'RMG'),
+    ('Rekha Devi', 'RMG'),
+    ('Manish Gupta', 'RMG'),
+    ('Anita Kumari', 'RMG'),
+    ('Vinod Singh', 'RMG'),
+    ('Shalini Patel', 'RMG'),
+    ('Dinesh Kumar', 'RMG'),
+    ('Geeta Devi', 'RMG')
 ) AS seed(name, department)
 WHERE NOT EXISTS (
   SELECT 1
@@ -136,7 +182,7 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Operations: 8 Petticoat.
+-- Operations: 8 Petticoat + 7 RMG.
 -- Cutting is required for the guided Petticoat production workflow.
 -- ---------------------------------------------------------------------------
 -- Operations shown in the manager dropdown after login.
@@ -151,7 +197,14 @@ VALUES
   ('Dhoka', 'PETTICOAT'),
   ('Folding', 'PETTICOAT'),
   ('Dori', 'PETTICOAT'),
-  ('Nada', 'PETTICOAT')
+  ('Nada', 'PETTICOAT'),
+  ('Kamarpatti', 'RMG'),
+  ('Interlock', 'RMG'),
+  ('Bottom', 'RMG'),
+  ('Dhoka', 'RMG'),
+  ('Folding', 'RMG'),
+  ('Dori', 'RMG'),
+  ('Nada', 'RMG')
 ON CONFLICT DO NOTHING;
 
 -- If you already ran an older seed, hide the previous starter operations
@@ -162,7 +215,7 @@ WHERE name IN (
   'Stitching', 'Elastic fitting', 'Finishing',
   'Packing', 'Checking', 'Ironing'
 )
-AND department = 'PETTICOAT'
+AND department IN ('PETTICOAT', 'RMG')
 AND is_active = true;
 
 -- Optional verification (remove the leading dashes to run):

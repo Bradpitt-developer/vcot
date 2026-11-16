@@ -284,7 +284,9 @@ export function AddEmployeeScreen({ navigation }: Props) {
             <View style={styles.infoRow}>
               <Info size={15} color={colors.info} strokeWidth={2} />
               <Text style={styles.infoText}>
-                Petticoat managers will see this employee only when they select one of the assigned operations.
+                {department === "PETTICOAT"
+                  ? "Petticoat managers will see this employee only when they select one of the assigned operations."
+                  : "RMG managers will be able to select this employee when adding a work entry."}
               </Text>
             </View>
 

@@ -48,6 +48,11 @@ export const departmentColors = {
     color: colors.petticoat,
     soft: colors.petticoatSoft,
   },
+  RMG: {
+    label: "RMG",
+    color: colors.rmg,
+    soft: colors.rmgSoft,
+  },
 } as const;
 
 export const radii = {

@@ -46,7 +46,7 @@ import { errorMessage } from "../../utils/format";
 
 type Props = BottomTabScreenProps<AdminTabParamList, "Setup">;
 
-const departments: Department[] = ["PETTICOAT"];
+const departments: Department[] = ["PETTICOAT", "RMG"];
 
 export function AdminSetupScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();

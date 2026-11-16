@@ -113,7 +113,8 @@ export function AddOperationScreen({ navigation }: Props) {
             <View style={styles.infoRow}>
               <Info size={15} color={colors.info} strokeWidth={2} />
               <Text style={styles.infoText}>
-                Only Petticoat managers will see this operation. You can disable it later from Setup.
+                Only {department === "PETTICOAT" ? "Petticoat" : "RMG"} managers
+                will see this operation. You can disable it later from Setup.
               </Text>
             </View>
 

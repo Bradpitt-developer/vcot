@@ -56,7 +56,7 @@ export function WelcomeScreen({ navigation }: Props) {
             <Text style={styles.headingAccent}>One simple app.</Text>
           </Text>
           <Text style={styles.description}>
-            Record daily Petticoat work clearly — no registers, no
+            Record daily Petticoat and RMG work clearly — no registers, no
             confusion.
           </Text>
         </View>

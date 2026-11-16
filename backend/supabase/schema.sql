@@ -20,14 +20,14 @@ CREATE TABLE IF NOT EXISTS public.staff_users (
   username text NOT NULL UNIQUE CHECK (username = lower(username)),
   password_hash text NOT NULL CHECK (char_length(password_hash) > 0),
   role text NOT NULL CHECK (role IN ('admin', 'manager')),
-  department text CHECK (department = 'PETTICOAT'),
+  department text CHECK (department IN ('PETTICOAT', 'RMG')),
   is_active boolean NOT NULL DEFAULT true,
   last_login_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT staff_users_role_department_check CHECK (
     (role = 'admin' AND department IS NULL)
-    OR (role = 'manager' AND department = 'PETTICOAT')
+    OR (role = 'manager' AND department IN ('PETTICOAT', 'RMG'))
   )
 );
 
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS staff_users_role_active_idx
 CREATE TABLE IF NOT EXISTS public.employees (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL CHECK (char_length(trim(name)) BETWEEN 2 AND 80),
-  department text NOT NULL CHECK (department = 'PETTICOAT'),
+  department text NOT NULL CHECK (department IN ('PETTICOAT', 'RMG')),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS employee_operations_operation_idx
 CREATE TABLE IF NOT EXISTS public.operations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL CHECK (char_length(trim(name)) BETWEEN 2 AND 60),
-  department text NOT NULL CHECK (department = 'PETTICOAT'),
+  department text NOT NULL CHECK (department IN ('PETTICOAT', 'RMG')),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS public.work_entries (
   employee_id uuid NOT NULL,
   manager_id uuid NOT NULL,
   operation_id uuid NOT NULL,
-  department text NOT NULL CHECK (department = 'PETTICOAT'),
+  department text NOT NULL CHECK (department IN ('PETTICOAT', 'RMG')),
   lot_no text NOT NULL CHECK (char_length(trim(lot_no)) BETWEEN 1 AND 40),
   quantity integer NOT NULL CHECK (quantity > 0 AND quantity <= 1000000),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -220,7 +220,7 @@ ALTER TABLE public.work_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_lots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_operations ENABLE ROW LEVEL SECURITY;
 
-COMMENT ON TABLE public.staff_users IS 'Admin and Petticoat manager login accounts.';
+COMMENT ON TABLE public.staff_users IS 'Admin and Petticoat/RMG manager login accounts.';
 COMMENT ON TABLE public.employees IS 'Employees shown in the manager work-entry dropdown.';
 COMMENT ON TABLE public.employee_operations IS 'Operation categories assigned to each employee.';
 COMMENT ON TABLE public.operations IS 'Department-specific operations shown in the manager dropdown.';

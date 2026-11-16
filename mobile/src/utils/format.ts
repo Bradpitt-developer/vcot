@@ -14,7 +14,9 @@ export function firstName(name: string): string {
 }
 
 export function departmentLabel(department: Department | null): string {
-  return department ? "Petticoat" : "Admin";
+  if (department === "PETTICOAT") return "Petticoat";
+  if (department === "RMG") return "RMG";
+  return "Admin";
 }
 
 export function formatTime(value: string): string {
