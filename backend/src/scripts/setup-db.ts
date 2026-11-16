@@ -23,6 +23,7 @@ const DEFAULT_OPERATIONS: Record<Department, readonly string[]> = {
     "Nada",
   ],
   RMG: [
+    "Cutting",
     "Kamarpatti",
     "Interlock",
     "Bottom",

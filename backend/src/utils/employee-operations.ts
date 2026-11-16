@@ -39,12 +39,10 @@ export async function validateOperationIds(
   const normalized = normalizeOperationIds(input);
   if (!normalized.ok) return normalized;
 
-  if (department === "RMG") return { ok: true, value: [] };
-
   if (normalized.value.length === 0) {
     return {
       ok: false,
-      error: "Select at least one operation for this Petticoat employee.",
+      error: `Select at least one operation for this ${department} employee.`,
     };
   }
 
@@ -52,15 +50,15 @@ export async function validateOperationIds(
     `SELECT id
      FROM operations
      WHERE id = ANY($1::uuid[])
-       AND department = 'PETTICOAT'
+       AND department = $2
        AND is_active = true`,
-    [normalized.value],
+    [normalized.value, department],
   );
 
   if (rows.length !== normalized.value.length) {
     return {
       ok: false,
-      error: "One or more selected operations are not available in Petticoat.",
+      error: `One or more selected operations are not available in ${department}.`,
     };
   }
 

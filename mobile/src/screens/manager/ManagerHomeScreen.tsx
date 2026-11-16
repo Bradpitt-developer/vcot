@@ -252,7 +252,7 @@ export function ManagerHomeScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {user?.department === "PETTICOAT" ? (
+            {user?.department === "PETTICOAT" || user?.department === "RMG" ? (
               <ProductionWorkflowCard
                 home={home}
                 onSaved={() => void loadHome({ quiet: true })}

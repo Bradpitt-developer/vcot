@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -47,18 +47,8 @@ export function AddEmployeeScreen({ navigation }: Props) {
           data.employees(),
         ]);
         if (mounted) {
-          setOperations(
-            operationResult.filter(
-              (operation) =>
-                operation.isActive && operation.department === "PETTICOAT"
-            )
-          );
-          setExistingEmployees(
-            employeeResult.filter(
-              (employee) =>
-                employee.isActive && employee.department === "PETTICOAT"
-            )
-          );
+          setOperations(operationResult.filter((operation) => operation.isActive));
+          setExistingEmployees(employeeResult);
         }
       } catch {
         if (mounted) {
@@ -79,9 +69,21 @@ export function AddEmployeeScreen({ navigation }: Props) {
     };
   }, []);
 
+  const sectionOperations = useMemo(
+    () => operations.filter((operation) => operation.department === department),
+    [department, operations]
+  );
+  const sectionEmployees = useMemo(
+    () =>
+      existingEmployees.filter(
+        (employee) => employee.isActive && employee.department === department
+      ),
+    [department, existingEmployees]
+  );
+
   const normalizedEmployeeName = name.trim().toLowerCase();
   const assignedOperationIds = new Set(
-    existingEmployees
+    sectionEmployees
       .filter(
         (employee) => employee.name.trim().toLowerCase() === normalizedEmployeeName
       )
@@ -92,7 +94,7 @@ export function AddEmployeeScreen({ navigation }: Props) {
 
   useEffect(() => {
     const disabledIds = new Set(
-      existingEmployees
+      sectionEmployees
         .filter(
           (employee) =>
             employee.name.trim().toLowerCase() === normalizedEmployeeName
@@ -105,11 +107,18 @@ export function AddEmployeeScreen({ navigation }: Props) {
     setSelectedOperationIds((current) =>
       current.filter((id) => !disabledIds.has(id))
     );
-  }, [existingEmployees, normalizedEmployeeName]);
+  }, [normalizedEmployeeName, sectionEmployees]);
 
-  const disabledOperationNames = operations
+  const disabledOperationNames = sectionOperations
     .filter((operation) => assignedOperationIds.has(operation.id))
     .map((operation) => operation.name);
+
+  useEffect(() => {
+    const allowedIds = new Set(sectionOperations.map((operation) => operation.id));
+    setSelectedOperationIds((current) =>
+      current.filter((id) => allowedIds.has(id))
+    );
+  }, [sectionOperations]);
 
   async function handleCreate() {
     Keyboard.dismiss();
@@ -121,19 +130,17 @@ export function AddEmployeeScreen({ navigation }: Props) {
       return;
     }
 
-    if (department === "PETTICOAT" && selectedOperationIds.length === 0) {
-      setError("Select at least one Petticoat operation for this employee.");
+    if (selectedOperationIds.length === 0) {
+      setError(`Select at least one ${department === "PETTICOAT" ? "Petticoat" : "RMG"} operation for this employee.`);
       return;
     }
 
     setLoading(true);
     try {
-      const operationIds =
-        department === "PETTICOAT" ? selectedOperationIds : undefined;
       const employee = await data.createEmployee({
         name: cleanName,
         department,
-        operationIds,
+        operationIds: selectedOperationIds,
       });
       showToast(`${employee.name} added successfully.`, "success");
       navigation.goBack();
@@ -200,12 +207,15 @@ export function AddEmployeeScreen({ navigation }: Props) {
               label="Manager type / section"
             />
 
-            {department === "PETTICOAT" ? (
               <View style={styles.operationsBlock}>
                 <FieldLabel
                   label="Operations"
                   required
-                  hint="This employee appears when the manager selects these operations"
+                  hint={
+                    department === "PETTICOAT"
+                      ? "This employee appears when the manager selects these operations"
+                      : "This employee appears when the RMG manager selects these operations"
+                  }
                 />
                 {operationsLoading ? (
                   <View style={styles.operationLoading}>
@@ -215,7 +225,7 @@ export function AddEmployeeScreen({ navigation }: Props) {
                   </View>
                 ) : (
                   <View style={styles.operationWrap}>
-                    {operations.map((operation) => {
+                    {sectionOperations.map((operation) => {
                       const selected = selectedOperationIds.includes(operation.id);
                       const disabled = assignedOperationIds.has(operation.id);
 
@@ -270,23 +280,22 @@ export function AddEmployeeScreen({ navigation }: Props) {
                         employee name. Choose another operation.
                       </Text>
                     ) : null}
-                    {operations.length === 0 ? (
+                    {sectionOperations.length === 0 ? (
                       <Text style={styles.noOperations}>
-                        No active Petticoat operations are available. Add them
+                        No active {department === "PETTICOAT" ? "Petticoat" : "RMG"} operations are available. Add them
                         from Setup first.
                       </Text>
                     ) : null}
                   </View>
                 )}
               </View>
-            ) : null}
 
             <View style={styles.infoRow}>
               <Info size={15} color={colors.info} strokeWidth={2} />
               <Text style={styles.infoText}>
                 {department === "PETTICOAT"
                   ? "Petticoat managers will see this employee only when they select one of the assigned operations."
-                  : "RMG managers will be able to select this employee when adding a work entry."}
+                  : "RMG managers will see this employee only when they select one of the assigned operations."}
               </Text>
             </View>
 

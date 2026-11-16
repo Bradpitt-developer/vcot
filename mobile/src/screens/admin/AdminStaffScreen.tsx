@@ -75,12 +75,7 @@ export function AdminStaffScreen({ navigation }: Props) {
       ]);
       setManagers(managerList);
       setEmployees(employeeList);
-      setOperations(
-        operationList.filter(
-          (operation) =>
-            operation.isActive && operation.department === "PETTICOAT"
-        )
-      );
+      setOperations(operationList.filter((operation) => operation.isActive));
       setError(null);
       loadedOnce.current = true;
     } catch (loadError) {
@@ -98,6 +93,12 @@ export function AdminStaffScreen({ navigation }: Props) {
   );
 
   const normalizedQuery = query.trim().toLowerCase();
+
+  const editOperationChoices = editOperationsEmployee
+    ? operations.filter(
+        (operation) => operation.department === editOperationsEmployee.department
+      )
+    : [];
 
   const filteredManagers = useMemo(
     () =>
@@ -201,11 +202,6 @@ export function AdminStaffScreen({ navigation }: Props) {
   }
 
   function openEmployeeOperationsEdit(employee: Employee) {
-    if (employee.department !== "PETTICOAT") {
-      showToast("Operation assignments are for Petticoat employees only.", "info");
-      return;
-    }
-
     setEditOperationsEmployee(employee);
     setSelectedOperationIds(employee.operations.map((operation) => operation.id));
     setOperationError(null);
@@ -598,7 +594,7 @@ export function AdminStaffScreen({ navigation }: Props) {
                 />
               </View>
               <View style={styles.resetHeaderText}>
-                <Text style={styles.resetTitle}>Edit Petticoat operations</Text>
+                <Text style={styles.resetTitle}>Edit {editOperationsEmployee?.department === "RMG" ? "RMG" : "Petticoat"} operations</Text>
                 <Text style={styles.resetSubtitle} numberOfLines={1}>
                   {editOperationsEmployee?.name}
                 </Text>
@@ -625,7 +621,7 @@ export function AdminStaffScreen({ navigation }: Props) {
                 This employee will appear only for the operations selected below.
               </Text>
               <View style={styles.operationWrap}>
-                {operations.map((operation) => {
+                {editOperationChoices.map((operation) => {
                   const selected = selectedOperationIds.includes(operation.id);
 
                   return (
@@ -658,9 +654,9 @@ export function AdminStaffScreen({ navigation }: Props) {
                     </Pressable>
                   );
                 })}
-                {operations.length === 0 ? (
+                {editOperationChoices.length === 0 ? (
                   <Text style={styles.noOperationText}>
-                    No active Petticoat operations are available. Add them from Setup.
+                    No active {editOperationsEmployee?.department === "RMG" ? "RMG" : "Petticoat"} operations are available. Add them from Setup.
                   </Text>
                 ) : null}
               </View>
@@ -782,20 +778,17 @@ function EmployeeRow({
         <Text style={styles.personMeta} numberOfLines={1}>
           {employee.isActive ? "Active employee" : "Disabled employee"}
         </Text>
-        {employee.department === "PETTICOAT" ? (
-          <Text style={styles.operationMeta} numberOfLines={2}>
-            {employee.operations.length > 0
-              ? employee.operations.map((operation) => operation.name).join(" · ")
-              : "No operation assigned"}
-          </Text>
-        ) : null}
+        <Text style={styles.operationMeta} numberOfLines={2}>
+          {employee.operations.length > 0
+            ? employee.operations.map((operation) => operation.name).join(" · ")
+            : "No operation assigned"}
+        </Text>
         <View style={styles.pillWrap}>
           <DepartmentPill department={employee.department} small />
         </View>
       </View>
       <View style={styles.rowActions}>
-        {employee.department === "PETTICOAT" ? (
-          <Pressable
+        <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Edit operations for ${employee.name}`}
             disabled={busy}
@@ -811,7 +804,6 @@ function EmployeeRow({
               strokeWidth={2.2}
             />
           </Pressable>
-        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Delete employee ${employee.name}`}

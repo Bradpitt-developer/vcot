@@ -26,7 +26,6 @@ const router = express.Router();
 
 router.use(authenticate, requireRole("manager"));
 
-const GUIDED_SCOPE = "PETTICOAT" as const;
 const MIDDLE_SET = new Set(MIDDLE_OPERATIONS.map((operation) => operation.toLowerCase()));
 
 type RequestBody = Record<string, unknown>;
@@ -46,17 +45,7 @@ function numericInput(value: unknown): number {
 }
 
 function requestManagerScope(req: Request, res: Response) {
-  const scope = managerScope(req, res);
-  if (!scope) return null;
-
-  if (scope.department !== GUIDED_SCOPE) {
-    res.status(403).json({
-      error: "The guided production workflow is available only in Petticoat.",
-    });
-    return null;
-  }
-
-  return scope;
+  return managerScope(req, res);
 }
 
 async function loadLotsWithProgress(department: string) {
@@ -115,11 +104,11 @@ router.get(
               panel::double precision AS panel,
               remarks, quantity, status, created_at, updated_at, completed_at
        FROM production_lots
-       WHERE department = 'PETTICOAT'
+       WHERE department = $1
          AND status = 'active'
-         AND lower(lot_number) = lower($1)
+         AND lower(lot_number) = lower($2)
        LIMIT 1`,
-      [lotNumber],
+      [scope.department, lotNumber],
     );
 
     const lot = lotResult.rows[0];
@@ -199,11 +188,11 @@ router.post(
     const cuttingResult = await pool.query<{ id: string }>(
       `SELECT id
        FROM operations
-       WHERE department = 'PETTICOAT'
-         AND lower(name) = lower($1)
+       WHERE department = $1
+         AND lower(name) = lower($2)
          AND is_active = true
        LIMIT 1`,
-      ["Cutting"],
+      [scope.department, "Cutting"],
     );
 
     const cuttingOperation = cuttingResult.rows[0];
@@ -238,11 +227,11 @@ router.post(
     const existing = await pool.query<{ id: string }>(
       `SELECT id
        FROM production_lots
-       WHERE department = 'PETTICOAT'
-         AND lower(lot_number) = lower($1)
+       WHERE department = $1
+         AND lower(lot_number) = lower($2)
          AND status = 'active'
        LIMIT 1`,
-      [lotNumber],
+      [scope.department, lotNumber],
     );
 
     if (existing.rows[0]) {
@@ -258,7 +247,7 @@ router.post(
       const inserted = await client.query<ProductionLotRow>(
         `INSERT INTO production_lots
            (manager_id, department, lot_number, meter, area, width, panel, remarks, quantity)
-         VALUES ($1, 'PETTICOAT', $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, manager_id, department, lot_number,
                    meter::double precision AS meter,
                    area::double precision AS area,
@@ -267,6 +256,7 @@ router.post(
                    remarks, quantity, status, created_at, updated_at, completed_at`,
         [
           scope.id,
+          scope.department,
           lotNumber,
           meter,
           area,
@@ -354,9 +344,9 @@ router.post(
                 panel::double precision AS panel,
                 remarks, quantity, status, created_at, updated_at, completed_at
          FROM production_lots
-         WHERE id = $1 AND department = 'PETTICOAT'
+         WHERE id = $1 AND department = $2
          FOR UPDATE`,
-        [lotId],
+        [lotId, scope.department],
       );
 
       const lot = lotResult.rows[0];
@@ -378,16 +368,16 @@ router.post(
         `SELECT id, name
          FROM operations
          WHERE id = $1
-           AND department = 'PETTICOAT'
+           AND department = $2
            AND is_active = true`,
-        [operationId],
+        [operationId, scope.department],
       );
 
       const operation = operationResult.rows[0];
       if (!operation) {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          error: "That operation is not available in Petticoat.",
+          error: "That operation is not available in your section.",
         });
       }
 

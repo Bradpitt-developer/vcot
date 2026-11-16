@@ -229,6 +229,7 @@ function seedDatabase(): DemoDatabase {
   );
   const petticoatOperation = (name: string) =>
     operationByName.get(`PETTICOAT:${name}`);
+  const rmgOperation = (name: string) => operationByName.get(`RMG:${name}`);
 
   employees[0].operations = [
     petticoatOperation("Cutting"),
@@ -243,6 +244,20 @@ function seedDatabase(): DemoDatabase {
     petticoatOperation("Nada"),
     petticoatOperation("Dhoka"),
     petticoatOperation("Folding"),
+  ].filter((operation): operation is Operation => Boolean(operation));
+  employees[3].operations = [
+    rmgOperation("Cutting"),
+    rmgOperation("Kamarpatti"),
+    rmgOperation("Bottom"),
+  ].filter((operation): operation is Operation => Boolean(operation));
+  employees[4].operations = [
+    rmgOperation("Interlock"),
+    rmgOperation("Dori"),
+  ].filter((operation): operation is Operation => Boolean(operation));
+  employees[5].operations = [
+    rmgOperation("Nada"),
+    rmgOperation("Dhoka"),
+    rmgOperation("Folding"),
   ].filter((operation): operation is Operation => Boolean(operation));
 
   const entries: WorkEntry[] = [
@@ -679,7 +694,7 @@ export const demoDataSource: DataSource = {
     const manager = requireManager(db);
     const department = manager.department as Department;
 
-    if (department !== "PETTICOAT") return null;
+    if (department !== "PETTICOAT" && department !== "RMG") return null;
 
     const lot = productionLots(db).find(
       (candidate) =>
@@ -696,7 +711,7 @@ export const demoDataSource: DataSource = {
     const manager = requireManager(db);
     const department = manager.department as Department;
 
-    if (department !== "PETTICOAT") {
+    if (department !== "PETTICOAT" && department !== "RMG") {
       throw new DemoError(
         "The guided production workflow is available only in Petticoat.",
         403
@@ -1076,9 +1091,9 @@ export const demoDataSource: DataSource = {
       : [];
     const department = validateDepartment(input.department);
 
-    if (department === "PETTICOAT" && operationIds.length === 0) {
+    if (operationIds.length === 0) {
       throw new DemoError(
-        "Select at least one operation for this Petticoat employee.",
+        `Select at least one operation for this ${department} employee.`,
         400
       );
     }
@@ -1089,12 +1104,10 @@ export const demoDataSource: DataSource = {
       department,
       isActive: true,
       createdAt: new Date().toISOString(),
-      operations:
-        department === "PETTICOAT"
-          ? db.operations.filter((operation) =>
-              operationIds.includes(operation.id)
-            )
-          : [],
+      operations: db.operations.filter((operation) =>
+        operationIds.includes(operation.id) &&
+        operation.department === department
+      ),
     };
     db.employees.push(employee);
     await persist(db);
@@ -1118,18 +1131,16 @@ export const demoDataSource: DataSource = {
     }
     if (input.operationIds !== undefined) {
       const department = employee.department;
-      if (department === "PETTICOAT" && input.operationIds.length === 0) {
+      if (input.operationIds.length === 0) {
         throw new DemoError(
-          "Select at least one operation for this Petticoat employee.",
+          `Select at least one operation for this ${department} employee.`,
           400
         );
       }
-      employee.operations =
-        department === "PETTICOAT"
-          ? db.operations.filter((operation) =>
-              input.operationIds?.includes(operation.id)
-            )
-          : [];
+      employee.operations = db.operations.filter((operation) =>
+        input.operationIds?.includes(operation.id) &&
+        operation.department === department
+      );
     }
 
     await persist(db);

@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS operations_department_active_idx
 CREATE TABLE IF NOT EXISTS public.production_lots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   manager_id uuid NOT NULL,
-  department text NOT NULL CHECK (department = 'PETTICOAT'),
+  department text NOT NULL CHECK (department IN ('PETTICOAT', 'RMG')),
   lot_number text NOT NULL CHECK (char_length(trim(lot_number)) BETWEEN 1 AND 40),
   meter numeric(12, 3) NOT NULL CHECK (meter >= 0),
   area numeric(12, 3) NOT NULL CHECK (area >= 0),

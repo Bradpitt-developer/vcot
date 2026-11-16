@@ -182,8 +182,8 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Operations: 8 Petticoat + 7 RMG.
--- Cutting is required for the guided Petticoat production workflow.
+-- Operations: 8 Petticoat + 8 RMG.
+-- Cutting is required for the guided production workflow in both sections.
 -- ---------------------------------------------------------------------------
 -- Operations shown in the manager dropdown after login.
 -- ---------------------------------------------------------------------------
@@ -198,6 +198,7 @@ VALUES
   ('Folding', 'PETTICOAT'),
   ('Dori', 'PETTICOAT'),
   ('Nada', 'PETTICOAT'),
+  ('Cutting', 'RMG'),
   ('Kamarpatti', 'RMG'),
   ('Interlock', 'RMG'),
   ('Bottom', 'RMG'),

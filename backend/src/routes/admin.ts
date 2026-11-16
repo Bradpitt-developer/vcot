@@ -621,25 +621,19 @@ router.patch(
       if (shouldValidateOperations) {
         if (
           requestedOperations === undefined &&
-          desiredDepartment === "RMG"
-        ) {
-          operationIdsResult = { ok: true, value: [] };
-        } else if (
-          requestedOperations === undefined &&
-          desiredDepartment === "PETTICOAT" &&
-          existing.department === "RMG"
+          desiredDepartment !== existing.department
         ) {
           await client.query("ROLLBACK");
           return res.status(400).json({
-            error: "Select at least one operation for this Petticoat employee.",
+            error: `Select at least one operation for this ${desiredDepartment} employee.`,
           });
-        } else {
-          operationIdsResult = await validateOperationIds(
-            client,
-            requestedOperations,
-            desiredDepartment,
-          );
         }
+
+        operationIdsResult = await validateOperationIds(
+          client,
+          requestedOperations,
+          desiredDepartment,
+        );
       }
 
       if (!operationIdsResult.ok) {
