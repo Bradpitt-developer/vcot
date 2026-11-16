@@ -353,19 +353,6 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
           </View>
 
           <SelectField
-            label="Assign employee"
-            placeholder="Select employee"
-            value={employeeId}
-            options={filteredEmployeeOptions}
-            onChange={(value) => {
-              setEmployeeId(value);
-              setLotError(null);
-            }}
-            emptyText="No employees assigned to this operation. Admin can add them in People."
-            icon={<UserRound size={17} color={colors.muted} strokeWidth={2} />}
-          />
-
-          <SelectField
             label="Next operation"
             placeholder="Select operation"
             value={operationId}
@@ -376,6 +363,19 @@ export function ProductionWorkflowCard({ home, onSaved }: Props) {
             }}
             emptyText="No next operation available."
             icon={<ClipboardPenLine size={17} color={colors.muted} strokeWidth={2} />}
+          />
+
+          <SelectField
+            label="Assign employee"
+            placeholder="Select employee"
+            value={employeeId}
+            options={filteredEmployeeOptions}
+            onChange={(value) => {
+              setEmployeeId(value);
+              setLotError(null);
+            }}
+            emptyText="No employees assigned to this operation. Admin can add them in People."
+            icon={<UserRound size={17} color={colors.muted} strokeWidth={2} />}
           />
 
           <PrimaryButton
