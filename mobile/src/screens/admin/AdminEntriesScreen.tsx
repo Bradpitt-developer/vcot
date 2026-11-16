@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -359,6 +360,22 @@ export function AdminEntriesScreen({}: Props) {
               </Pressable>
             </View>
 
+            <ScrollView
+              style={styles.reportScroll}
+              contentContainerStyle={styles.reportScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+            <Text style={styles.reportSectionLabel}>Operation</Text>
+            <SelectField
+              label="Operation"
+              placeholder="Choose operation"
+              value={selectedOperationId}
+              options={operationOptions}
+              onChange={setSelectedOperationId}
+              icon={<FileSpreadsheet size={17} color={colors.muted} strokeWidth={2} />}
+            />
+
             <Text style={styles.reportSectionLabel}>Report period</Text>
             <View style={styles.modeRow}>
               <Pressable
@@ -494,15 +511,6 @@ export function AdminEntriesScreen({}: Props) {
               </Pressable>
             </View>
 
-            <SelectField
-              label="Operation"
-              placeholder="Choose operation"
-              value={selectedOperationId}
-              options={operationOptions}
-              onChange={setSelectedOperationId}
-              icon={<FileSpreadsheet size={17} color={colors.muted} strokeWidth={2} />}
-            />
-
             <Text style={styles.reportRangeSummary}>
               {reportRange.dateLabel}
               {reportRange.from ? ` · ${calculateRangeInclusiveDays(reportRange.from, reportRange.to)} days` : ""}
@@ -605,6 +613,7 @@ export function AdminEntriesScreen({}: Props) {
               workbook with operation sheets. WhatsApp and email open the
               device sharing flow with the report attached.
             </Text>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -708,15 +717,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay,
   },
   reportSheet: {
-    maxHeight: "92%",
+    maxHeight: "94%",
     backgroundColor: colors.canvas,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.md,
     ...shadow.raised,
+  },
+  reportScroll: {
+    flexGrow: 0,
+  },
+  reportScrollContent: {
+    gap: spacing.md,
+    paddingBottom: spacing.sm,
   },
   reportHeader: {
     flexDirection: "row",
@@ -847,19 +862,17 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   customDates: {
-    flexDirection: "row",
     gap: spacing.sm,
   },
   dateField: {
-    flex: 1,
-    minWidth: 0,
+    width: "100%",
   },
   dateInput: {
-    minHeight: 68,
-    fontSize: 20,
-    lineHeight: 24,
+    minHeight: 76,
+    fontSize: 22,
+    lineHeight: 27,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     paddingVertical: 0,
   },
   dateFormatHint: {

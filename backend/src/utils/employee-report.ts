@@ -608,9 +608,12 @@ export async function buildEmployeeReport(pool: Pool, input: EmployeeReportInput
   }
 
   const output = await workbook.xlsx.writeBuffer();
-  const buffer = Buffer.isBuffer(output)
-    ? output
-    : Buffer.from(output as ArrayBuffer);
+  const buffer =
+    Buffer.isBuffer(output)
+      ? output
+      : output instanceof Uint8Array
+        ? Buffer.from(output)
+        : Buffer.from(output as unknown as ArrayBuffer);
 
   const operationPart = input.operationId === "all" ? "all" : "operation";
   const filename = safeFilename(
