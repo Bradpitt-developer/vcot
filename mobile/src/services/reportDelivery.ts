@@ -116,7 +116,7 @@ async function downloadAndroidFile(report: GeneratedReport): Promise<string> {
   const contentType = report.file.contentType;
   const fileUri = await saf.createFileAsync(
     permission.directoryUri,
-    baseName,
+    `${baseName}.xlsx`,
     contentType,
   );
   await saf.writeAsStringAsync(fileUri, report.file.base64, {

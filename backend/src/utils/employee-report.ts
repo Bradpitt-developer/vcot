@@ -616,9 +616,10 @@ export async function buildEmployeeReport(pool: Pool, input: EmployeeReportInput
         : Buffer.from(output as unknown as ArrayBuffer);
 
   const operationPart = input.operationId === "all" ? "all" : "operation";
-  const filename = safeFilename(
-    `silai_saathi_${department}_${status}_${fromLabel}_to_${toLabel}_${operationPart}.xlsx`,
-  );
+  const departmentPart = department === "ALL" ? "all" : safeFilename(department);
+  const filename = `${safeFilename(
+    `silai_saathi_${departmentPart}_${status}_${fromLabel}_to_${toLabel}_${operationPart}`,
+  )}.xlsx`;
 
   return {
     filename,
