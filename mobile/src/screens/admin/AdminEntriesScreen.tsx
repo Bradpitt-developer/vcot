@@ -501,7 +501,7 @@ export function AdminEntriesScreen({}: Props) {
                   placeholder="14/11/2026"
                   value={customFrom}
                   onChangeText={setCustomFrom}
-                  keyboardType="number-pad"
+                  keyboardType="default"
                   maxLength={10}
                   returnKeyType="done"
                 />
@@ -511,7 +511,7 @@ export function AdminEntriesScreen({}: Props) {
                   placeholder="18/11/2026"
                   value={customTo}
                   onChangeText={setCustomTo}
-                  keyboardType="number-pad"
+                  keyboardType="default"
                   maxLength={10}
                   returnKeyType="done"
                 />
