@@ -290,7 +290,7 @@ export function AdminSetupScreen({ navigation }: Props) {
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Manage lots"
+            accessibilityLabel="Manage Lots"
             onPress={() => setAdminLotsOpen(true)}
             style={({ pressed }) => [
               styles.manageLotsButton,
@@ -305,7 +305,7 @@ export function AdminSetupScreen({ navigation }: Props) {
               />
             </View>
             <View style={styles.manageAdminText}>
-              <Text style={styles.manageLotsTitle}>Manage lots</Text>
+              <Text style={styles.manageLotsTitle}>Manage Lots</Text>
               <Text style={styles.manageLotsHint}>
                 Edit a lot quantity and see which manager made it
               </Text>
@@ -318,7 +318,7 @@ export function AdminSetupScreen({ navigation }: Props) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Manage admins"
+            accessibilityLabel="Manage Admins"
             onPress={() => setAdminManageOpen(true)}
             style={({ pressed }) => [
               styles.manageAdminButton,
@@ -333,7 +333,7 @@ export function AdminSetupScreen({ navigation }: Props) {
               />
             </View>
             <View style={styles.manageAdminText}>
-              <Text style={styles.manageAdminTitle}>Manage admins</Text>
+              <Text style={styles.manageAdminTitle}>Manage Admins</Text>
               <Text style={styles.manageAdminHint}>
                 Add or remove administrator accounts
               </Text>

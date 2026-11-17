@@ -195,7 +195,7 @@ export function AdminManageSheet({ visible, onClose, currentUserId }: Props) {
               )}
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.title}>Manage admins</Text>
+              <Text style={styles.title}>Manage Admins</Text>
               <Text style={styles.subtitle}>
                 {unlocked
                   ? "Add or remove admin accounts"

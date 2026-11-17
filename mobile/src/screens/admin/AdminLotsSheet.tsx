@@ -200,7 +200,7 @@ export function AdminLotsSheet({ visible, onClose }: Props) {
               <ClipboardList size={20} color={colors.admin} strokeWidth={2.1} />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.title}>Manage lots</Text>
+              <Text style={styles.title}>Manage Lots</Text>
               <Text style={styles.subtitle}>
                 Correct lot quantities and see who created them
               </Text>
