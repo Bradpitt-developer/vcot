@@ -990,6 +990,20 @@ export const demoDataSource: DataSource = {
     );
   },
 
+  async adminLots() {
+    throw new DemoError(
+      "Admin lots can be managed only in live mode.",
+      403
+    );
+  },
+
+  async updateAdminLot() {
+    throw new DemoError(
+      "Admin lots can be managed only in live mode.",
+      403
+    );
+  },
+
   async managers() {
     const db = await getDatabase();
     requireAdmin(db);

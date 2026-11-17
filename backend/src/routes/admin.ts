@@ -6,6 +6,7 @@ import { config } from "../config";
 import { pool } from "../db";
 import { authenticate, getAuthenticatedUser, requireRole } from "../middleware/auth";
 import type {
+  AdminProductionLotRow,
   CountRow,
   Department,
   EmployeeRow,
@@ -23,6 +24,7 @@ import {
 } from "../utils/employee-operations";
 import { buildEmployeeReport } from "../utils/employee-report";
 import {
+  toAdminProductionLot,
   toEmployee,
   toEntry,
   toOperation,
@@ -35,6 +37,7 @@ import {
   normalizeDepartment,
   normalizeUsername,
   parseLimit,
+  isPositiveInteger,
   USERNAME_PATTERN,
 } from "../utils/validation";
 
@@ -888,6 +891,177 @@ function todayInKolkata(): string {
 
   return `${values.year}-${values.month}-${values.day}`;
 }
+
+// ---------------------------------------------------------------------------
+// Production lot override (main admin password required)
+// ---------------------------------------------------------------------------
+
+router.get(
+  "/lots",
+  requireAdminManagePassword,
+  asyncHandler(async (req, res) => {
+    const status = String(req.query.status || "all").trim().toLowerCase();
+    if (status !== "all" && status !== "active" && status !== "completed") {
+      return res.status(400).json({ error: "Invalid lot status filter." });
+    }
+
+    const search = String(req.query.search || "").trim();
+    const params: unknown[] = [];
+    let where = "";
+
+    if (status !== "all") {
+      params.push(status);
+      where += `${where ? " AND" : " WHERE"} p.status = $${params.length}`;
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      where += `${where ? " AND" : " WHERE"} (
+        p.lot_number ILIKE $${params.length}
+        OR s.name ILIKE $${params.length}
+        OR s.username ILIKE $${params.length}
+      )`;
+    }
+
+    const { rows } = await pool.query<AdminProductionLotRow>(
+      `SELECT p.id, p.manager_id, p.department, p.lot_number,
+              p.meter::double precision AS meter,
+              p.area::double precision AS area,
+              p.width::double precision AS width,
+              p.panel::double precision AS panel,
+              p.remarks, p.quantity, p.status, p.created_at, p.updated_at, p.completed_at,
+              s.name AS manager_name,
+              s.username AS manager_username,
+              s.department AS manager_department,
+              (SELECT count(*)::int FROM work_entries e WHERE e.production_lot_id = p.id) AS entry_count
+       FROM production_lots p
+       JOIN staff_users s ON s.id = p.manager_id
+       ${where}
+       ORDER BY p.updated_at DESC, p.created_at DESC
+       LIMIT 100`,
+      params,
+    );
+
+    if (rows.length === 0) {
+      return res.json({ lots: [] });
+    }
+
+    const ids = rows.map((row) => row.id);
+    const steps = await pool.query<{ production_lot_id: string; operation_name: string }>(
+      `SELECT DISTINCT w.production_lot_id, o.name AS operation_name
+       FROM work_entries w
+       JOIN operations o ON o.id = w.operation_id
+       WHERE w.production_lot_id = ANY($1::uuid[])`,
+      [ids],
+    );
+
+    const completedByLot = new Map<string, string[]>();
+    for (const step of steps.rows) {
+      const names = completedByLot.get(step.production_lot_id) ?? [];
+      names.push(step.operation_name);
+      completedByLot.set(step.production_lot_id, names);
+    }
+
+    return res.json({
+      lots: rows.map((row) =>
+        toAdminProductionLot(row, completedByLot.get(row.id) ?? [])
+      ),
+    });
+  }),
+);
+
+router.patch(
+  "/lots/:lotId",
+  requireAdminManagePassword,
+  asyncHandler(async (req, res) => {
+    const { lotId } = req.params;
+    if (!isUuid(lotId)) {
+      return res.status(400).json({ error: "Invalid lot ID." });
+    }
+
+    const body = requestBody(req);
+    const quantity = Number(body.quantity);
+
+    if (!isPositiveInteger(quantity) || quantity > 1_000_000) {
+      return res.status(400).json({
+        error: "Quantity must be a whole number from 1 to 1,000,000.",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const existing = await client.query<Pick<AdminProductionLotRow, "id" | "lot_number">>(
+        "SELECT id, lot_number FROM production_lots WHERE id = $1 FOR UPDATE",
+        [lotId],
+      );
+
+      if (!existing.rows[0]) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Production lot not found." });
+      }
+
+      await client.query(
+        `UPDATE production_lots
+         SET quantity = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [quantity, lotId],
+      );
+
+      await client.query(
+        `UPDATE work_entries
+         SET quantity = $1
+         WHERE production_lot_id = $2`,
+        [quantity, lotId],
+      );
+
+      const updated = await client.query<AdminProductionLotRow>(
+        `SELECT p.id, p.manager_id, p.department, p.lot_number,
+                p.meter::double precision AS meter,
+                p.area::double precision AS area,
+                p.width::double precision AS width,
+                p.panel::double precision AS panel,
+                p.remarks, p.quantity, p.status, p.created_at, p.updated_at, p.completed_at,
+                s.name AS manager_name,
+                s.username AS manager_username,
+                s.department AS manager_department,
+                (SELECT count(*)::int FROM work_entries e WHERE e.production_lot_id = p.id) AS entry_count
+         FROM production_lots p
+         JOIN staff_users s ON s.id = p.manager_id
+         WHERE p.id = $1`,
+        [lotId],
+      );
+
+      const row = updated.rows[0];
+      if (!row) {
+        throw new Error("Updated production lot could not be loaded.");
+      }
+
+      const steps = await client.query<{ operation_name: string }>(
+        `SELECT DISTINCT o.name AS operation_name
+         FROM work_entries w
+         JOIN operations o ON o.id = w.operation_id
+         WHERE w.production_lot_id = $1`,
+        [lotId],
+      );
+
+      await client.query("COMMIT");
+      return res.json({
+        lot: toAdminProductionLot(
+          row,
+          steps.rows.map((step) => step.operation_name),
+        ),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Work entries

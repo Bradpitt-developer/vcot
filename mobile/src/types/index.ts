@@ -105,6 +105,13 @@ export type CreateProductionLotInput = {
   quantity: number;
 };
 
+export type AdminProductionLot = ProductionLot & {
+  managerName: string;
+  managerUsername: string;
+  managerDepartment: Department;
+  entryCount: number;
+};
+
 export type ManagerHomeData = {
   employees: Employee[];
   operations: Operation[];
@@ -214,6 +221,15 @@ export type DataSource = {
     masterPassword: string,
   ): Promise<AdminAccount>;
   deleteAdmin(id: string, masterPassword: string): Promise<void>;
+  adminLots(
+    masterPassword: string,
+    options?: { status?: "all" | "active" | "completed"; search?: string },
+  ): Promise<AdminProductionLot[]>;
+  updateAdminLot(
+    id: string,
+    quantity: number,
+    masterPassword: string,
+  ): Promise<AdminProductionLot>;
   managers(): Promise<Manager[]>;
   createManager(input: CreateManagerInput): Promise<Manager>;
   updateManager(id: string, input: UpdateManagerInput): Promise<Manager>;

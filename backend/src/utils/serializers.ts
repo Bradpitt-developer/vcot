@@ -6,6 +6,8 @@ import type {
   EmployeeRow,
   Operation,
   OperationRow,
+  AdminProductionLot,
+  AdminProductionLotRow,
   ProductionLot,
   ProductionLotRow,
   StaffUser,
@@ -102,5 +104,20 @@ export function toProductionLot(
     availableOperations: workflow.availableOperations,
     createdAt: toIso(row.created_at),
     completedAt: toNullableIso(row.completed_at),
+  };
+}
+
+export function toAdminProductionLot(
+  row: AdminProductionLotRow,
+  completedOperationNames: string[],
+): AdminProductionLot {
+  const base = toProductionLot(row, completedOperationNames);
+
+  return {
+    ...base,
+    managerName: row.manager_name,
+    managerUsername: row.manager_username,
+    managerDepartment: row.manager_department,
+    entryCount: Number(row.entry_count),
   };
 }

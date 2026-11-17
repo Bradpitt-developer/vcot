@@ -14,6 +14,7 @@ import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import {
+  ClipboardList,
   Info,
   LogOut,
   Plus,
@@ -35,6 +36,7 @@ import { colors, departmentColors, radii, spacing } from "../../constants/theme"
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { AdminManageSheet } from "./AdminManageSheet";
+import { AdminLotsSheet } from "./AdminLotsSheet";
 import type {
   AdminStackParamList,
   AdminTabParamList,
@@ -57,6 +59,7 @@ export function AdminSetupScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [adminManageOpen, setAdminManageOpen] = useState(false);
+  const [adminLotsOpen, setAdminLotsOpen] = useState(false);
   const loadedOnce = useRef(false);
 
   const rootNavigation =
@@ -281,10 +284,38 @@ export function AdminSetupScreen({ navigation }: Props) {
           <View style={styles.infoRow}>
             <Info size={16} color={colors.muted} strokeWidth={2} />
             <Text style={styles.infoText}>
-              The main admin password can add or remove administrator accounts.
+              The main admin password can manage lots or add/remove administrator accounts.
               It is never saved on this device.
             </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Manage lots"
+            onPress={() => setAdminLotsOpen(true)}
+            style={({ pressed }) => [
+              styles.manageLotsButton,
+              pressed && styles.manageLotsButtonPressed,
+            ]}
+          >
+            <View style={styles.manageLotsIcon}>
+              <ClipboardList
+                size={18}
+                color={colors.white}
+                strokeWidth={2.2}
+              />
+            </View>
+            <View style={styles.manageAdminText}>
+              <Text style={styles.manageLotsTitle}>Manage lots</Text>
+              <Text style={styles.manageLotsHint}>
+                Edit a lot quantity and see which manager made it
+              </Text>
+            </View>
+            <ClipboardList
+              size={19}
+              color={colors.faint}
+              strokeWidth={1.9}
+            />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Manage admins"
@@ -336,6 +367,10 @@ export function AdminSetupScreen({ navigation }: Props) {
         </View>
         <Text style={styles.version}>Silai Saathi v{APP_VERSION}</Text>
       </ScrollView>
+      <AdminLotsSheet
+        visible={adminLotsOpen}
+        onClose={() => setAdminLotsOpen(false)}
+      />
       <AdminManageSheet
         visible={adminManageOpen}
         onClose={() => setAdminManageOpen(false)}
@@ -523,6 +558,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 15,
     color: colors.faint,
+  },
+  manageLotsButton: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.primaryDark,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  manageLotsButtonPressed: {
+    backgroundColor: "#083B35",
+    transform: [{ scale: 0.99 }],
+  },
+  manageLotsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryBright,
+  },
+  manageLotsTitle: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  manageLotsHint: {
+    color: "#E6F7EF",
+    fontSize: 9.5,
+    fontWeight: "500",
+    marginTop: 2,
   },
   manageAdminButton: {
     minHeight: 58,

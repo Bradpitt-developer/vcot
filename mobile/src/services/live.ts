@@ -2,6 +2,7 @@ import { API_URL } from "../constants/config";
 import type {
   AdminAccount,
   AdminDashboardData,
+  AdminProductionLot,
   CreateAdminInput,
   CreateEmployeeInput,
   CreateManagerInput,
@@ -183,6 +184,30 @@ export const liveDataSource: DataSource = {
       method: "DELETE",
       headers: { "x-admin-manage-password": masterPassword },
     });
+  },
+
+  async adminLots(masterPassword, options = {}): Promise<AdminProductionLot[]> {
+    const query = new URLSearchParams();
+    if (options.status) query.set("status", options.status);
+    if (options.search?.trim()) query.set("search", options.search.trim());
+
+    const result = await request<{ lots: AdminProductionLot[] }>(
+      `/admin/lots${query.size ? `?${query.toString()}` : ""}`,
+      { headers: { "x-admin-manage-password": masterPassword } },
+    );
+    return result.lots;
+  },
+
+  async updateAdminLot(id, quantity, masterPassword): Promise<AdminProductionLot> {
+    const result = await request<{ lot: AdminProductionLot }>(
+      `/admin/lots/${id}`,
+      {
+        method: "PATCH",
+        body: { quantity },
+        headers: { "x-admin-manage-password": masterPassword },
+      },
+    );
+    return result.lot;
   },
 
   async managers(): Promise<Manager[]> {

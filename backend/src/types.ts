@@ -106,6 +106,20 @@ export interface ProductionLot {
   completedAt: string | null;
 }
 
+export interface AdminProductionLot extends ProductionLot {
+  managerName: string;
+  managerUsername: string;
+  managerDepartment: Department;
+  entryCount: number;
+}
+
+export interface AdminProductionLotRow extends ProductionLotRow {
+  manager_name: string;
+  manager_username: string;
+  manager_department: Department;
+  entry_count: string | number;
+}
+
 export interface ProductionLotRow {
   id: string;
   manager_id: string;
