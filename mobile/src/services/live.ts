@@ -210,6 +210,17 @@ export const liveDataSource: DataSource = {
     return result.lot;
   },
 
+  async deleteAdminLot(id, masterPassword): Promise<{ deletedLotNumber: string }> {
+    const result = await request<{ deletedLotNumber: string }>(
+      `/admin/lots/${id}`,
+      {
+        method: "DELETE",
+        headers: { "x-admin-manage-password": masterPassword },
+      },
+    );
+    return result;
+  },
+
   async managers(): Promise<Manager[]> {
     const result = await request<{ managers: Manager[] }>("/admin/managers");
     return result.managers;

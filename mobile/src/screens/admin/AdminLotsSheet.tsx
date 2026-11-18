@@ -15,6 +15,7 @@ import {
   Lock,
   Search,
   ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react-native";
 import { colors, radii, spacing } from "../../constants/theme";
@@ -24,6 +25,7 @@ import { PrimaryButton } from "../../components/Buttons";
 import { ErrorBanner, TextField } from "../../components/Form";
 import { data } from "../../services/data";
 import type { AdminProductionLot } from "../../types";
+import { confirmAction } from "../../utils/confirm";
 import { errorMessage, formatDate } from "../../utils/format";
 
 type Props = {
@@ -43,6 +45,7 @@ export function AdminLotsSheet({ visible, onClose }: Props) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<LotStatusFilter>("all");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
@@ -174,6 +177,40 @@ export function AdminLotsSheet({ visible, onClose }: Props) {
       setSaveError(errorMessage(saveFailure));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function deleteLot(lot: AdminProductionLot) {
+    if (lot.status !== "active") return;
+
+    const confirmed = await confirmAction({
+      title: `Delete lot ${lot.lotNo}?`,
+      message:
+        `This uncompleted lot will be permanently deleted, and its ${lot.entryCount} saved production record${
+          lot.entryCount === 1 ? "" : "s"
+        } will also be removed. Completed lots cannot be deleted.`,
+      confirmLabel: "Delete lot",
+      destructive: true,
+    });
+
+    if (!confirmed) return;
+
+    setDeletingId(lot.id);
+    setSaveError(null);
+
+    try {
+      const result = await data.deleteAdminLot(lot.id, mainPassword.trim());
+      setLots((current) => current.filter((item) => item.id !== lot.id));
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[lot.id];
+        return next;
+      });
+      showToast(`Lot ${result.deletedLotNumber} deleted.`, "success");
+    } catch (deleteFailure) {
+      setSaveError(errorMessage(deleteFailure));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -433,6 +470,34 @@ export function AdminLotsSheet({ visible, onClose }: Props) {
                                 <Text style={styles.saveButtonText}>Save</Text>
                               )}
                             </Pressable>
+                            {lot.status === "active" ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Delete uncompleted lot ${lot.lotNo}`}
+                                accessibilityState={{
+                                  disabled: Boolean(deletingId),
+                                }}
+                                disabled={Boolean(deletingId)}
+                                onPress={() => void deleteLot(lot)}
+                                style={({ pressed }) => [
+                                  styles.deleteLotButton,
+                                  {
+                                    opacity:
+                                      deletingId === lot.id || deletingId
+                                        ? 0.35
+                                        : pressed
+                                          ? 0.65
+                                          : 1,
+                                  },
+                                ]}
+                              >
+                                {deletingId === lot.id ? (
+                                  <ActivityIndicator color={colors.danger} />
+                                ) : (
+                                  <Trash2 size={19} color={colors.danger} strokeWidth={2.2} />
+                                )}
+                              </Pressable>
+                            ) : null}
                           </View>
                         </View>
                       );
@@ -756,6 +821,16 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 12,
     fontWeight: "800",
+  },
+  deleteLotButton: {
+    width: 44,
+    minHeight: 44,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyState: {
     alignItems: "center",

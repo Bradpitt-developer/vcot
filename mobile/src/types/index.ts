@@ -221,6 +221,10 @@ export type DataSource = {
     masterPassword: string,
   ): Promise<AdminAccount>;
   deleteAdmin(id: string, masterPassword: string): Promise<void>;
+  deleteAdminLot(
+    id: string,
+    masterPassword: string,
+  ): Promise<{ deletedLotNumber: string }>;
   adminLots(
     masterPassword: string,
     options?: { status?: "all" | "active" | "completed"; search?: string },

@@ -1063,6 +1063,56 @@ router.patch(
   }),
 );
 
+router.delete(
+  "/lots/:lotId",
+  requireAdminManagePassword,
+  asyncHandler(async (req, res) => {
+    const { lotId } = req.params;
+    if (!isUuid(lotId)) {
+      return res.status(400).json({ error: "Invalid lot ID." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const existing = await client.query<
+        Pick<AdminProductionLotRow, "id" | "lot_number" | "status">
+      >(
+        "SELECT id, lot_number, status FROM production_lots WHERE id = $1 FOR UPDATE",
+        [lotId],
+      );
+
+      const lot = existing.rows[0];
+      if (!lot) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Production lot not found." });
+      }
+
+      if (lot.status !== "active") {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error: "Completed lots cannot be deleted. Only uncompleted lots can be removed.",
+        });
+      }
+
+      await client.query(
+        "DELETE FROM work_entries WHERE production_lot_id = $1",
+        [lotId],
+      );
+      await client.query("DELETE FROM production_lots WHERE id = $1", [lotId]);
+      await client.query("COMMIT");
+
+      return res.json({ deletedLotNumber: lot.lot_number });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Work entries
 // ---------------------------------------------------------------------------
